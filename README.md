@@ -4,6 +4,8 @@
 
 Built for Green Shift Hacks 2026.
 
+**Live:** https://shiftwatt.vercel.app · **Intro (1 min):** https://youtu.be/6B3TAKk6Wms · **Demo:** https://www.youtube.com/watch?v=xLnWNbJzWCU
+
 ## Run
 
 ```sh
