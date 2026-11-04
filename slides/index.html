@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShiftWatt · Intro slides</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d0b; --surface: #121614; --surface-2: #181d1a; --line: rgba(232,255,238,.08);
+    --fg: #ecf2ee; --fg-2: #b8c4bc; --muted: #7c8a81; --faint: #56625a;
+    --clean: #5be3a0; --amber: #f2b84b; --dirty: #ff7a59;
+    --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #050706; color: var(--fg); font-family: Archivo, system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+  /* 1920×1080 stage, scaled to fit the window */
+  .stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center; }
+  .slide { position: absolute; inset: 0; padding: 120px 140px; background: var(--bg); overflow: hidden; display: flex; flex-direction: column; opacity: 0; visibility: hidden; transition: opacity 400ms ease, visibility 0s linear 400ms; }
+  .slide.active { opacity: 1; visibility: visible; transition: opacity 400ms ease; }
+  .slide::before { content: ""; position: absolute; inset: auto -10% -55% 35%; height: 110%; background: radial-gradient(closest-side, rgba(91,227,160,.13), transparent); pointer-events: none; }
+
+  /* entrance: subtle rise, staggered */
+  .in { opacity: 0; transform: translateY(14px); }
+  .slide.active .in { animation: rise 600ms var(--ease) forwards; animation-delay: calc(var(--d, 0) * 110ms + 150ms); }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .static .in, .static .slide .in { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .static .slide { transition: none !important; }
+  @media (prefers-reduced-motion: reduce) { .slide.active .in { animation: fade 300ms ease forwards; transform: none; } @keyframes fade { to { opacity: 1; } } }
+
+  .brand { display: flex; align-items: center; gap: 16px; font-size: 32px; font-weight: 650; font-stretch: 112%; letter-spacing: -0.02em; }
+  .mark { width: 48px; height: 48px; border-radius: 14px; background: var(--clean); display: grid; place-items: center; }
+  .eyebrow { font: 500 22px "IBM Plex Mono", monospace; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  h1 { margin: 0; font-size: 150px; line-height: .93; font-weight: 700; font-stretch: 125%; letter-spacing: -0.045em; }
+  h2 { margin: 18px 0 0; font-size: 84px; line-height: 1.02; font-weight: 700; font-stretch: 118%; letter-spacing: -0.04em; max-width: 24ch; text-wrap: balance; }
+  .green { color: var(--clean); } .red { color: var(--dirty); }
+  .lead { margin: 40px 0 0; font-size: 36px; line-height: 1.35; color: var(--fg-2); max-width: 36ch; }
+  .foot { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; font-size: 24px; color: var(--muted); }
+  .foot .mono { font-size: 20px; }
+
+  /* clean→dirty strip */
+  .strip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 5px; height: 64px; margin-top: 56px; }
+  .strip i { border-radius: 6px; transform-origin: bottom; }
+  .slide.active .strip i { animation: bar 700ms var(--ease) both; animation-delay: calc(var(--i) * 14ms + 450ms); }
+  .static .strip i { animation: none !important; }
+  @keyframes bar { from { transform: scaleY(.15); opacity: 0; } }
+  .axis { display: flex; justify-content: space-between; margin-top: 16px; font: 20px "IBM Plex Mono", monospace; color: var(--faint); }
+
+  /* problem: a day on the grid */
+  .day-slide { padding: 84px 140px 64px; }
+  .day-slide h2 { font-size: 64px; max-width: none; margin-top: 12px; }
+  .day { margin-top: 26px; }
+  .day svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .src { font: 18px "IBM Plex Mono", monospace; color: var(--faint); }
+
+  /* solution */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 64px; }
+  .step { padding: 36px 36px 40px; border-radius: 24px; background: var(--surface); }
+  .step .n { font: 500 22px "IBM Plex Mono", monospace; color: var(--clean); }
+  .step h3 { margin: 18px 0 10px; font-size: 40px; font-weight: 650; font-stretch: 110%; letter-spacing: -0.02em; }
+  .step p { margin: 0; font-size: 26px; line-height: 1.4; color: var(--muted); }
+  .result { margin-top: auto; padding: 36px 44px; border-radius: 24px; background: linear-gradient(120deg, rgba(91,227,160,.13), rgba(91,227,160,.03) 60%); box-shadow: inset 0 0 0 2px rgba(91,227,160,.2); display: grid; grid-template-columns: auto 1fr auto; gap: 44px; align-items: center; }
+  .result .label { font-size: 28px; color: var(--fg-2); }
+  .result .label b { display: block; color: var(--fg); font-size: 34px; font-weight: 650; }
+  .bars { display: grid; gap: 14px; }
+  .bar { display: grid; grid-template-columns: 170px 1fr 150px; gap: 20px; align-items: center; font-size: 24px; color: var(--fg-2); }
+  .bar .track { height: 18px; border-radius: 9px; background: rgba(255,255,255,.06); overflow: hidden; }
+  .bar .track i { display: block; height: 100%; border-radius: 9px; transform-origin: left; }
+  .slide.active .bar .track i { animation: grow 900ms var(--ease) both; animation-delay: 900ms; }
+  .static .bar .track i { animation: none !important; }
+  @keyframes grow { from { transform: scaleX(0); } }
+  .bar .v { font: 500 26px "IBM Plex Mono", monospace; text-align: right; color: var(--fg); }
+  .result .pct { font-size: 96px; font-weight: 700; font-stretch: 125%; letter-spacing: -0.045em; color: var(--clean); line-height: .9; text-align: right; }
+  .result .pct small { display: block; font-size: 24px; font-weight: 500; font-stretch: 100%; letter-spacing: 0; color: var(--fg-2); margin-top: 8px; }
+
+  /* impact */
+  .nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 72px; }
+  .num { padding: 40px; border-radius: 24px; background: var(--surface); }
+  .num .v { font-size: 120px; line-height: .88; font-weight: 700; font-stretch: 125%; letter-spacing: -0.05em; }
+  .num .v small { font-size: 36px; font-weight: 600; font-stretch: 110%; letter-spacing: -0.01em; margin-left: 8px; }
+  .num .k { margin-top: 22px; font-size: 28px; line-height: 1.35; color: var(--fg-2); }
+  .num .s { margin-top: 14px; font: 18px "IBM Plex Mono", monospace; color: var(--faint); }
+  .demo { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+  .demo .go { display: inline-flex; align-items: center; gap: 22px; padding: 26px 40px; border-radius: 22px; background: var(--clean); color: #062014; font-size: 44px; font-weight: 700; font-stretch: 112%; letter-spacing: -0.02em; }
+  .demo .go svg { width: 40px; height: 40px; }
+
+  /* chrome (hidden in static export) */
+  .hud { position: fixed; right: 20px; bottom: 16px; font: 13px "IBM Plex Mono", monospace; color: #3d4741; z-index: 5; user-select: none; }
+  .static .hud { display: none; }
+
+  @media print {
+    @page { size: 1920px 1080px; margin: 0; }
+    html, body { overflow: visible; background: var(--bg); }
+    .stage { position: static; transform: none !important; }
+    .slide { position: relative; opacity: 1; visibility: visible; page-break-after: always; break-after: page; height: 1080px; }
+    .in { opacity: 1; transform: none; animation: none; }
+    .strip i, .bar .track i { animation: none; }
+    .hud { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <!-- 1 · Title -->
+  <section class="slide">
+    <div class="brand in" style="--d:0"><span class="mark"><svg width="26" height="26" viewBox="0 0 16 16" fill="none"><path d="M2.5 10.5c2.2 0 2.6-5 5-5s2.8 5 6 5" stroke="#062014" stroke-width="1.9" stroke-linecap="round"/></svg></span>ShiftWatt</div>
+    <h1 class="in" style="--d:1;margin-top:110px">Same electricity.<br><span class="green">Cleaner hours.</span></h1>
+    <p class="lead in" style="--d:2">Runs the things that can wait, like your EV, dishwasher and laundry, when the grid is cleanest, before the deadline you set.</p>
+    <div class="in" style="--d:3">
+      <div class="strip" id="strip"></div>
+      <div class="axis"><span>6:30 PM · 321 g</span><span>tomorrow 11:30 AM · 47 g</span><span>+24 h</span></div>
+    </div>
+    <div class="foot in" style="--d:4"><span>Aryan Thakor</span><span class="mono">Green Shift Hacks 2026</span></div>
+  </section>
+
+  <!-- 2 · Problem: a day on the grid -->
+  <section class="slide day-slide">
+    <div class="eyebrow in" style="--d:0">The problem</div>
+    <h2 class="in" style="--d:1">Electricity isn't equally clean all day.</h2>
+    <div class="day in" style="--d:2"><svg id="day" viewBox="0 0 1640 720" role="img" aria-label="A day on the grid: carbon intensity over 24 hours, with wind at night, solar at midday, gas peakers in the evening"></svg></div>
+    <div class="foot in" style="--d:3"><span class="src">California grid, modeled demo data · Curtailment: U.S. EIA, Today in Energy, May 2025</span><span class="mono">2 / 4</span></div>
+  </section>
+
+  <!-- 3 · Solution -->
+  <section class="slide">
+    <div class="eyebrow in" style="--d:0">The solution</div>
+    <h2 class="in" style="--d:1">Set a deadline. <span class="green">ShiftWatt picks the cleanest hours.</span></h2>
+    <div class="steps">
+      <div class="step in" style="--d:2"><div class="n">01</div><h3>Read the forecast</h3><p>48 hours of grid carbon intensity, every 30 minutes. Live for Great Britain.</p></div>
+      <div class="step in" style="--d:3"><div class="n">02</div><h3>Find the cleanest window</h3><p>Checks every start time before your deadline, respecting quiet hours.</p></div>
+      <div class="step in" style="--d:4"><div class="n">03</div><h3>Run it and log it</h3><p>Records grid intensity when it was ready vs. when it actually ran.</p></div>
+    </div>
+    <div class="result in" style="--d:5">
+      <div class="label">One EV charge<b>18 kWh</b></div>
+      <div class="bars">
+        <div class="bar"><span>Start now</span><span class="track"><i style="background:var(--dirty)"></i></span><span class="v">5.91 kg</span></div>
+        <div class="bar"><span>ShiftWatt</span><span class="track"><i style="background:var(--clean);width:18.6%"></i></span><span class="v">1.10 kg</span></div>
+      </div>
+      <div class="pct">−81%<small>CO₂, and cheaper</small></div>
+    </div>
+  </section>
+
+  <!-- 4 · Impact + demo -->
+  <section class="slide">
+    <div class="eyebrow in" style="--d:0">The impact</div>
+    <h2 class="in" style="--d:1">Same habits. <span class="green">Less carbon.</span></h2>
+    <div class="nums">
+      <div class="num in" style="--d:2"><div class="v green">≈500<small>kg</small></div><div class="k">CO₂ avoided per year, one home with an EV</div><div class="s">California, modeled</div></div>
+      <div class="num in" style="--d:3"><div class="v green">≈106<small>t</small></div><div class="k">CO₂ per year if 2,400 students shift their laundry</div><div class="s">No new hardware</div></div>
+      <div class="num in" style="--d:4"><div class="v">±7<small>g</small></div><div class="k">Forecast error on live UK grid data, checked against actuals</div><div class="s">NESO Carbon Intensity API</div></div>
+    </div>
+    <div class="demo in" style="--d:5">
+      <span class="src">Savings use average intensity, the conservative measure. Method and sources on Devpost.</span>
+      <span class="go">Live demo<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
+    </div>
+  </section>
+
+</div>
+<div class="hud" id="hud"></div>
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  const stage = document.getElementById("stage");
+  const params = new URLSearchParams(location.search);
+  if (params.has("static")) document.documentElement.classList.add("static");
+
+  // strip on the title slide: tonight's peak → tomorrow's solar valley → evening again
+  const vals = [321,326,319,312,300,290,288,282,276,271,270,272,270,268,274,270,266,264,250,235,202,160,118,96,70,52,47,47,49,60,95,119,150,190,228,250,270,290,305,320,326,322,316,310,300,292,289,285];
+  const stops = [[0,[91,227,160]],[0.45,[200,230,107]],[0.7,[242,184,75]],[1,[255,122,89]]];
+  const tone = (t) => { for (let i = 1; i < stops.length; i++) { const [b, cb] = stops[i]; if (t <= b) { const [a, ca] = stops[i-1]; const k = (t-a)/(b-a); return `rgb(${ca.map((v,j)=>Math.round(v+(cb[j]-v)*k)).join(",")})`; } } return "rgb(255,122,89)"; };
+  const min = Math.min(...vals), max = Math.max(...vals);
+  document.getElementById("strip").innerHTML = vals.map((v, i) => `<i style="--i:${i};background:${tone((v-min)/(max-min))}"></i>`).join("");
+  document.querySelector(".bar .track i").style.width = "100%";
+
+  /* ---------- slide 2: a day on the grid ---------- */
+  (function buildDay() {
+    const H = [271,270,270,271,274,270,264,240,202,150,96,62,47,52,109,170,228,290,321,320,319,305,288,280,271];
+    const X = (h) => 30 + h * (1580 / 24);
+    const Y = (v) => 320 - (v / 340) * 260;
+    const lo = Math.min(...H), hi = Math.max(...H);
+    const col = (v) => tone((v - lo) / (hi - lo));
+    let line = `M${X(0)},${Y(H[0])}`;
+    for (let h = 1; h < H.length; h++) { const mx = (X(h - 1) + X(h)) / 2; line += ` C${mx},${Y(H[h - 1])} ${mx},${Y(H[h])} ${X(h)},${Y(H[h])}`; }
+    const stops = H.map((v, h) => `<stop offset="${h / 24}" stop-color="${col(v)}"/>`).join("");
+    const G = 640;
+
+    const turbine = (x, d) => `<g><line x1="${x}" y1="${G}" x2="${x}" y2="470" stroke="#8fa197" stroke-width="5" stroke-linecap="round"/>
+      <g transform="translate(${x},470)"><g>${[0, 120, 240].map((a) => `<path d="M0 0 L-5 -10 L0 -70 L5 -10 Z" fill="#d6dfd9" transform="rotate(${a})"/>`).join("")}
+      <animateTransform attributeName="transform" type="rotate" from="${d} 0 0" to="${d + 360} 0 0" dur="5s" repeatCount="indefinite"/></g><circle r="6" fill="#eef3ef"/></g></g>`;
+    const tower = (x) => `<path d="M${x - 22} ${G} L${x - 6} 476 L${x + 6} 476 L${x + 22} ${G} M${x - 15} 586 L${x + 15} 586 M${x - 11} 534 L${x + 11} 534 M${x - 30} 490 L${x + 30} 490 M${x - 18} ${G} L${x + 11} 534 M${x + 18} ${G} L${x - 11} 534" stroke="#45524b" stroke-width="3" fill="none" stroke-linejoin="round"/>`;
+    const car = (x, mode) => {
+      const ghost = mode === "ghost";
+      return `<g transform="translate(${x - 44},${G - 38})">
+        <path d="M6 24 L15 10 Q19 4 27 4 L58 4 Q66 4 72 10 L82 21 Q88 23 88 28 L88 32 L0 32 L0 28 Q0 24 6 24 Z" fill="${ghost ? "rgba(91,227,160,.16)" : "#d9e1dc"}" stroke="${ghost ? "#5be3a0" : "none"}" stroke-width="2.5" ${ghost ? 'stroke-dasharray="6 5"' : ""}/>
+        <path d="M24 10 L30 8 L44 8 L44 20 L18 20 Z M50 8 L60 8 L68 20 L50 20 Z" fill="${ghost ? "rgba(91,227,160,.25)" : "#2b3a33"}"/>
+        <circle cx="21" cy="33" r="7.5" fill="${ghost ? "none" : "#1c2420"}" stroke="${ghost ? "#5be3a0" : "#0a0d0b"}" stroke-width="2.5"/>
+        <circle cx="67" cy="33" r="7.5" fill="${ghost ? "none" : "#1c2420"}" stroke="${ghost ? "#5be3a0" : "#0a0d0b"}" stroke-width="2.5"/></g>`;
+    };
+    const panels = [];
+    for (let r = 0; r < 2; r++) for (let x = X(9.7) + r * 14; x < X(14.3) - 50; x += 62) {
+      const y = 536 + r * 28;
+      panels.push(`<polygon points="${x},${y + 20} ${x + 52},${y + 20} ${x + 60},${y} ${x + 8},${y}" fill="#1f3f5e" stroke="#6fa3cf" stroke-width="1.5"/><line x1="${x + 30}" y1="${y + 20}" x2="${x + 30}" y2="${y + 30}" stroke="#45524b" stroke-width="3"/>`);
+    }
+    const wirePts = [[30, 500], [X(5.6), 478], [X(8.6), 478], [X(15), 478], [1372, 574]];
+    let wire = `M${wirePts[0][0]},${wirePts[0][1]}`;
+    for (let i = 1; i < wirePts.length; i++) { const [x0, y0] = wirePts[i - 1], [x1, y1] = wirePts[i]; wire += ` Q${(x0 + x1) / 2},${Math.max(y0, y1) + 22} ${x1},${y1}`; }
+    const particles = Array.from({ length: 9 }, (_, i) => `<circle r="4" fill="#f7e7a6"><animateMotion dur="7s" repeatCount="indefinite" begin="-${(i * 7) / 9}s" path="${wire}"/></circle>`).join("");
+    const smoke = Array.from({ length: 5 }, (_, i) => `<circle cx="1540" cy="470" r="12" fill="#a9b1ab" opacity="0">
+      <animate attributeName="cy" values="470;392" dur="4s" begin="-${i * 0.8}s" repeatCount="indefinite"/>
+      <animate attributeName="cx" values="1540;1570" dur="4s" begin="-${i * 0.8}s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="10;26" dur="4s" begin="-${i * 0.8}s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.45;0" dur="4s" begin="-${i * 0.8}s" repeatCount="indefinite"/></circle>`).join("");
+    const xe = X(18.5), xm = X(11.5);
+
+    document.getElementById("day").innerHTML = `
+      <defs>
+        <linearGradient id="dl" gradientUnits="userSpaceOnUse" x1="${X(0)}" x2="${X(24)}" y1="0" y2="0">${stops}</linearGradient>
+        <linearGradient id="df" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+        <mask id="dm"><rect width="1640" height="330" fill="url(#df)"/></mask>
+        <pattern id="hatch" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="3" height="10" fill="#f7d154" opacity=".18"/></pattern>
+        <radialGradient id="sunglow"><stop offset="0" stop-color="#f7d154" stop-opacity=".55"/><stop offset="1" stop-color="#f7d154" stop-opacity="0"/></radialGradient>
+        <marker id="ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#5be3a0"/></marker>
+      </defs>
+      <rect x="${X(6.5)}" y="14" width="${X(18.8) - X(6.5)}" height="${G - 14}" rx="18" fill="#f7d154" opacity=".035"/>
+      ${[100, 200, 300].map((v) => `<line x1="${X(0)}" x2="${X(24)}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(232,255,238,.07)"/><text x="${X(0) + 4}" y="${Y(v) - 6}" font-family="IBM Plex Mono" font-size="15" fill="#56625a">${v} g</text>`).join("")}
+      <rect x="${X(10)}" y="30" width="${X(14) - X(10)}" height="${320 - 30}" fill="url(#hatch)"/>
+      <text x="${(X(10) + X(14)) / 2}" y="58" text-anchor="middle" font-family="IBM Plex Mono" font-size="17" fill="#f7d154" letter-spacing="1.5">SURPLUS SOLAR</text>
+      <text x="${(X(10) + X(14)) / 2}" y="82" text-anchor="middle" font-family="Archivo" font-size="17" fill="#c9b46a">3.4 million MWh curtailed in 2024</text>
+      <path d="${line} L${X(24)},320 L${X(0)},320 Z" fill="url(#dl)" mask="url(#dm)"/>
+      <path d="${line}" fill="none" stroke="url(#dl)" stroke-width="5" stroke-linecap="round"/>
+      ${[[0, "12 AM"], [6, "6 AM"], [12, "12 PM"], [18, "6 PM"], [24, "12 AM"]].map(([h, l], i) => `<text x="${X(h)}" y="358" text-anchor="${i === 0 ? "start" : i === 4 ? "end" : "middle"}" font-family="IBM Plex Mono" font-size="17" fill="#7c8a81">${l}</text>`).join("")}
+
+      <line x1="${xe}" y1="${Y(321) + 10}" x2="${xe}" y2="${G - 44}" stroke="#ff7a59" stroke-width="2" stroke-dasharray="4 6" opacity=".6"/>
+      <circle cx="${xe}" cy="${Y(321)}" r="9" fill="#ff7a59" stroke="#0a0d0b" stroke-width="3"/>
+      <g transform="translate(${xe + 22},${Y(321) + 96})"><text font-family="Archivo" font-weight="700" font-size="34" fill="#ff7a59" style="font-stretch:118%">6:30 PM · 321 g</text><text y="28" font-family="Archivo" font-size="19" fill="#b8c4bc">gas peakers + everyone plugs in</text></g>
+      <line x1="${xm}" y1="${Y(52) + 10}" x2="${xm}" y2="${G - 44}" stroke="#5be3a0" stroke-width="2" stroke-dasharray="4 6" opacity=".6"/>
+      <circle cx="${xm}" cy="${Y(50)}" r="9" fill="#5be3a0" stroke="#0a0d0b" stroke-width="3"/>
+      <g transform="translate(${xm},${Y(50) - 92})"><text text-anchor="middle" font-family="Archivo" font-weight="700" font-size="34" fill="#5be3a0" style="font-stretch:118%">11:30 AM · 47 g</text><text y="28" text-anchor="middle" font-family="Archivo" font-size="19" fill="#b8c4bc">solar outruns demand</text></g>
+
+      <circle cx="${X(12)}" cy="420" r="70" fill="url(#sunglow)"/><circle cx="${X(12)}" cy="420" r="24" fill="#f7d154"/>
+      ${[18, 21.5, 2.5].map((h) => `<circle cx="${X(h)}" cy="${400 + ((h * 37) % 30)}" r="2" fill="#cfd8d2" opacity=".5"/>`).join("")}
+      <line x1="0" y1="${G}" x2="1640" y2="${G}" stroke="#2c3832" stroke-width="2"/>
+      ${turbine(X(0.9), 0)}${turbine(X(2.4), 40)}${turbine(X(3.9), 80)}
+      ${tower(X(5.6))}${tower(X(8.6))}${tower(X(15))}
+      <path d="${wire}" fill="none" stroke="#5b6a62" stroke-width="2"/>
+      ${particles}
+      ${panels.join("")}
+      <g>
+        <rect x="${X(16.05)}" y="562" width="104" height="78" fill="#26302b"/>
+        <polygon points="${X(16.05) - 10},564 ${X(16.05) + 52},520 ${X(16.05) + 114},564" fill="#33413a"/>
+        <rect x="${X(16.05) + 16}" y="580" width="22" height="20" fill="#f2c94c"/><rect x="${X(16.05) + 64}" y="580" width="22" height="20" fill="#f2c94c"/>
+        <rect x="${X(16.05) + 42}" y="606" width="20" height="34" fill="#1b231f"/>
+      </g>
+      <path d="M${X(16.05) + 104} 610 Q${X(16.05) + 120} 630 ${xe - 40} 616" fill="none" stroke="#ff7a59" stroke-width="3"><animate attributeName="stroke-opacity" values="1;.35;1" dur="1.6s" repeatCount="indefinite"/></path>
+      ${car(xe, "real")}
+      ${car(xm, "ghost")}
+      <g>
+        <rect x="1372" y="570" width="128" height="70" fill="#2a332e"/>
+        <rect x="1386" y="586" width="100" height="8" fill="#3b4741"/><rect x="1386" y="604" width="100" height="8" fill="#3b4741"/>
+        <rect x="1524" y="470" width="32" height="170" fill="#3a4540"/>
+        <rect x="1524" y="486" width="32" height="10" fill="#ff7a59" opacity=".7"/>
+        <rect x="1500" y="600" width="26" height="40" fill="#2a332e"/>
+      </g>
+      ${smoke}
+      <path d="M${xe} ${G + 8} Q${xe} ${G + 40} ${xe - 30} ${G + 40} L${xm + 30} ${G + 40} Q${xm} ${G + 40} ${xm} ${G + 12}" fill="none" stroke="#5be3a0" stroke-width="3" stroke-dasharray="10 8" marker-end="url(#ah)"/>
+      <text x="${(xe + xm) / 2}" y="${G + 72}" text-anchor="middle" font-family="Archivo" font-weight="600" font-size="22" fill="#5be3a0">ShiftWatt moves the charge to clean hours · 85% less CO₂ per kWh</text>
+    `;
+  })();
+
+  let cur = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+  function show(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, k) => s.classList.toggle("active", k === cur));
+    history.replaceState(null, "", `#${cur + 1}${location.search ? "" : ""}`);
+    document.getElementById("hud").textContent = `${cur + 1} / ${slides.length}  ·  ← →  ·  F fullscreen`;
+  }
+  function fit() { const s = Math.min(innerWidth / 1920, innerHeight / 1080); stage.style.transform = `translate(-50%, -50%) scale(${s})`; }
+  addEventListener("resize", fit);
+  addEventListener("hashchange", () => show((parseInt(location.hash.slice(1), 10) || 1) - 1));
+  addEventListener("keydown", (e) => {
+    if (["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"].includes(e.key)) { e.preventDefault(); show(cur + 1); }
+    if (["ArrowLeft", "ArrowUp", "PageUp", "Backspace"].includes(e.key)) { e.preventDefault(); show(cur - 1); }
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+    if (e.key.toLowerCase() === "f") document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+  });
+  addEventListener("click", (e) => { if (e.clientX > innerWidth / 3) show(cur + 1); else show(cur - 1); });
+  fit(); show(cur);
+</script>
+</body>
+</html>

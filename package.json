@@ -1,0 +1,7 @@
+{
+  "name": "shiftwatt",
+  "private": true,
+  "scripts": {
+    "dev": "npx --yes live-server --port=4417 --no-browser --wait=150"
+  }
+}

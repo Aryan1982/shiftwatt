@@ -1,0 +1,40 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; }
+  body { width: 1500px; height: 1000px; background: #0a0d0b; color: #ecf2ee; font-family: Archivo, sans-serif; overflow: hidden; position: relative; }
+  .glow { position: absolute; inset: auto -200px -380px 300px; height: 800px; background: radial-gradient(closest-side, rgba(91,227,160,.18), transparent); }
+  .wrap { position: absolute; inset: 90px 100px; display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 18px; font-size: 38px; font-weight: 650; font-stretch: 112%; letter-spacing: -0.02em; }
+  .mark { width: 56px; height: 56px; border-radius: 16px; background: #5be3a0; display: grid; place-items: center; }
+  h1 { margin: 70px 0 0; font-size: 104px; line-height: .95; font-weight: 700; font-stretch: 125%; letter-spacing: -0.045em; }
+  h1 span { color: #5be3a0; }
+  .nums { display: flex; align-items: baseline; gap: 28px; margin-top: auto; font-family: "IBM Plex Mono", monospace; font-size: 30px; color: #b8c4bc; }
+  .nums b { font-family: Archivo; font-stretch: 125%; font-size: 76px; font-weight: 700; letter-spacing: -0.04em; }
+  .dirty { color: #ff7a59; } .clean { color: #5be3a0; }
+  .strip { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; height: 56px; margin-top: 34px; }
+  .strip i { border-radius: 5px; }
+  .axis { display: flex; justify-content: space-between; font: 22px "IBM Plex Mono", monospace; color: #56625a; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="wrap">
+  <div class="brand"><span class="mark"><svg width="30" height="30" viewBox="0 0 16 16" fill="none"><path d="M2.5 10.5c2.2 0 2.6-5 5-5s2.8 5 6 5" stroke="#062014" stroke-width="1.9" stroke-linecap="round"/></svg></span>ShiftWatt</div>
+  <h1>Same electricity.<br><span>Cleaner hours.</span></h1>
+  <div class="nums"><span><b class="dirty">321</b> g now</span><span>→</span><span><b class="clean">47</b> g at 11:30</span><span style="margin-left:auto">same EV charge, −81% CO₂</span></div>
+  <div class="strip" id="strip"></div>
+  <div class="axis"><span>Now</span><span>+12h</span><span>+24h</span></div>
+</div>
+<script>
+  const stops = [[0, [91, 227, 160]], [0.45, [200, 230, 107]], [0.7, [242, 184, 75]], [1, [255, 122, 89]]];
+  const tone = (t) => { for (let i = 1; i < stops.length; i++) { const [b, cb] = stops[i]; if (t <= b) { const [a, ca] = stops[i - 1]; const k = (t - a) / (b - a); return `rgb(${ca.map((v, j) => Math.round(v + (cb[j] - v) * k)).join(",")})`; } } return "rgb(255,122,89)"; };
+  const vals = [321,326,319,312,300,290,288,282,276,271,270,272,270,268,274,270,266,264,250,235,202,160,118,96,70,52,47,47,49,60,95,119,150,190,228,250,270,290,305,320,326,322,316,310,300,292,289,285];
+  const min = Math.min(...vals), max = Math.max(...vals);
+  document.getElementById("strip").innerHTML = vals.map((v) => `<i style="background:${tone((v - min) / (max - min))}"></i>`).join("");
+</script>
+</body>
+</html>
