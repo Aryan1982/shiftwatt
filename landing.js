@@ -113,7 +113,8 @@ function play(ms = 11000) {
   const n = slots.length, t0 = performance.now();
   $("#tl-play").setAttribute("aria-pressed", "true");
   const step = (t) => {
-    const p = Math.min(1, (t - t0) / ms);
+    // the first rAF timestamp can be slightly earlier than t0
+    const p = Math.min(1, Math.max(0, (t - t0) / ms));
     const i = Math.min(n - 1, Math.floor(p * n));
     if (i !== ui.idx) selectSlot(i);
     if (p < 1) playing = requestAnimationFrame(step);
