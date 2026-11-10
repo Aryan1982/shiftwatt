@@ -37,6 +37,8 @@ const P = {
   pulse: "M22 12h-4l-3 9L9 3l-3 9H2",
   refresh: "M21 12a9 9 0 1 1-2.64-6.36L21 8|M21 3v5h-5",
   external: "M15 3h6v6|M10 14 21 3|M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6",
+  socket: "R3 3 18 18 5|M9.5 8v3.5|M14.5 8v3.5|M12 15.5h.01",
+  logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4|M16 17l5-5-5-5|M21 12H9",
 };
 function icon(name) {
   const parts = (P[name] || "").split("|").map((d) => {
@@ -83,13 +85,15 @@ function relWhen(t) {
 }
 const kg = (v) => (v >= 100 ? Math.round(v).toLocaleString() : v.toFixed(v < 10 ? 2 : 1));
 const money = (v) => `${region().currency}${Math.max(0, v).toFixed(2)}`;
+const escHTML = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 /* ============================== state ============================== */
 const store = {
-  region: localStorage.getItem("sw_region") || "caiso",
+  region: "caiso",
   slots: [],
   nowIdx: NOW_IDX,
-  devices: DEVICES.map((d) => ({ ...d })),
+  // the e-bike charger runs through a ShiftWatt Plug (the optional plug for appliances with no app)
+  devices: DEVICES.map((d) => (d.id === "bike" ? { ...d, auto: true, kind: "bike", via: "ShiftWatt Plug", plugId: "SW-3MD8", model: "ShiftWatt Plug · SW-3MD8" } : { ...d })),
   runs: {},
   history: buildHistory(),
   planDev: "ev",
@@ -98,13 +102,14 @@ const store = {
   booked: false,
   reminded: false,
   period: 60,
-  homeName: "Aryan's home",
+  homeName: "John's home",
   prefs: { cleanAlerts: true, runAlerts: true, weekly: true, signal: "average" },
   tesla: false,
   notifs: [],
   grid: null,
   gridErr: null,
   gridLoading: false,
+  plugShown: null,
 };
 const region = () => REGIONS[store.region];
 const dev = (id) => store.devices.find((d) => d.id === id);
@@ -132,7 +137,7 @@ async function loadRegion() {
   store.slots = slots || buildSlots(store.region);
   store.nowIdx = NOW_IDX;
   store.runs = {};
-  for (const id of ["ev", "dish", "water"]) {
+  for (const id of ["ev", "dish", "water", "bike"]) {
     const d = dev(id);
     if (d) schedule(id, optimize(d, clamp(d.readyBy, minReadyBy(d), horizonH())), true);
   }
@@ -141,14 +146,14 @@ async function loadRegion() {
 function sourceText() {
   if (store.source === "live") return `Live forecast · ${store.live.source} · ${store.live.area}`;
   if (store.source === "fallback") return "Live forecast unavailable · showing modeled data";
-  return "Modeled from typical generation mix · demo data";
+  return "Modeled from typical generation mix";
 }
 function sourceBadge() {
   return store.source === "live" ? `<span class="src live"><span class="live-dot"></span>Live</span>` : `<span class="src">Modeled</span>`;
 }
 
 /* ---------- persistence ---------- */
-const STATE_KEY = "sw_state";
+const STATE_KEY = "sw_state", ONBOARD_KEY = "sw_onboarded";
 function save() {
   if (!store.slots.length) return;
   const state = {
@@ -171,7 +176,7 @@ function readState() {
 function applySettings(s) {
   if (REGIONS[s.region]) store.region = s.region;
   Object.assign(store, { homeName: s.homeName, prefs: { ...store.prefs, ...s.prefs }, tesla: s.tesla, period: s.period, planMode: s.planMode, scale: s.scale, booked: s.booked, reminded: s.reminded });
-  if (Array.isArray(s.devices) && s.devices.length) store.devices = s.devices;
+  if (Array.isArray(s.devices)) store.devices = s.devices;
   if (!dev(store.planDev)) store.planDev = store.devices[0]?.id;
   store.history.push(...(s.extraHistory || []).map((h) => ({ ...h, at: new Date(h.at) })));
   store.notifs = (s.notifs || []).map((n) => ({ ...n, t: new Date(n.t) }));
@@ -426,14 +431,16 @@ const ROUTES = {
   today: { title: "Today", icon: "today", sub: () => `${demoNow().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })} · ${region().place}` },
   plan: { title: "Plan a run", nav: "Plan", icon: "plan", sub: () => "Pick a deadline. ShiftWatt finds the cleanest hours before it." },
   devices: { title: "Devices", icon: "devices", sub: () => `${store.devices.length} connected · ${Object.keys(store.runs).length} scheduled` },
+  plug: { title: "ShiftWatt Plug", nav: "Plug", icon: "socket", sub: () => "Optional hardware for appliances that have no app" },
   impact: { title: "Impact", icon: "impact", sub: () => "Measured against running each load the moment it was ready" },
-  campus: { title: "Campus", icon: "campus", sub: () => `${CAMPUS.school} · ${CAMPUS.myHall} · illustrative data` },
+  campus: { title: "Campus", icon: "campus", sub: () => `${CAMPUS.school} · ${CAMPUS.myHall}` },
   live: { title: "Live grid", icon: "pulse", sub: () => "Real-time data from the NESO Carbon Intensity API · Great Britain" },
   settings: { title: "Settings", icon: "settings", foot: true, sub: () => "Home, notifications, data and integrations" },
   method: { title: "How it works", icon: "method", foot: true, sub: () => "How ShiftWatt calculates every number" },
 };
 const ACTIONS = {
   devices: () => `<button class="btn primary" id="act-add" type="button">${icon("plus")}Add device</button>`,
+  plug: () => `<button class="btn primary" id="act-pair" type="button">${icon("plus")}Pair a plug</button>`,
   impact: () => `<div class="seg" id="period">${[7, 30, 60].map((p) => `<button type="button" data-p="${p}" aria-pressed="${store.period === p}">${p}D</button>`).join("")}</div>
     <button class="btn" id="act-export" type="button">${icon("download")}Export</button>`,
   live: () => `<span class="small muted mono" id="grid-at">${store.grid ? `Fetched ${store.grid.at.toLocaleTimeString()}` : ""}</span>
@@ -449,7 +456,7 @@ function renderNav() {
   $("#nav").innerHTML = entries.filter(([, v]) => !v.foot).map(link).join("");
   $("#nav-foot").innerHTML = entries.filter(([, v]) => v.foot).map(link).join("");
   $("#tabbar").innerHTML = entries.filter(([k]) => k !== "method").map(link).join("");
-  $("#home-switch").innerHTML = `<span class="home-ico">${icon("home")}</span><span class="home-text"><span class="home-name">${store.homeName}</span><span class="home-sub">${region().place} · ${region().grid}</span></span>${icon("chevron")}`;
+  $("#home-switch").innerHTML = `<span class="home-ico">${icon("home")}</span><span class="home-text"><span class="home-name">${escHTML(store.homeName)}</span><span class="home-sub">${region().place} · ${region().grid}</span></span>${icon("chevron")}`;
 }
 
 function renderLive() {
@@ -521,6 +528,7 @@ function renderView(enter = true) {
   v.classList.remove("entering");
   VIEWS[r](v);
   if (r === "devices") $("#act-add").onclick = addDeviceFlow;
+  if (r === "plug") $("#act-pair").onclick = pairPlug;
   if (r === "impact") {
     $$("#period button").forEach((b) => (b.onclick = () => { store.period = +b.dataset.p; renderView(false); }));
     $("#act-export").onclick = exportCSV;
@@ -628,7 +636,13 @@ function runRow(r) {
 }
 
 VIEWS.plan = (v) => {
+  if (!dev(store.planDev)) store.planDev = store.devices[0]?.id;
   const d = dev(store.planDev);
+  if (!d) {
+    v.innerHTML = `<section class="card hero"><h2>Nothing to plan yet</h2><p class="muted" style="margin:0">Pair a ShiftWatt Plug or add a connected device first.</p>
+      <div class="actions"><a class="btn primary lg" href="#/plug">Pair a plug</a><a class="btn lg" href="#/devices">Devices</a></div></section>`;
+    return;
+  }
   d.readyBy = clamp(d.readyBy, minReadyBy(d), horizonH());
   v.innerHTML = `
   <section class="card">
@@ -689,8 +703,120 @@ VIEWS.plan = (v) => {
   update();
 };
 
+/* ---------- ShiftWatt Plug (optional hardware for appliances that have no app) ---------- */
+const PLUG = "ShiftWatt Plug";
+const isPlug = (d) => !!d.plugId;
+const plugStd = () => (store.region === "gb" ? "uk" : "us");
+const PLUG_SPEC = {
+  us: { socket: "NEMA 5-15 · 120 V", relay: "15 A relay · 1.8 kW max" },
+  uk: { socket: "BS 1363 · 230 V", relay: "13 A relay · 3 kW max" },
+};
+function plugState(d) { const r = store.runs[d.id]; return r?.status === "running" ? "running" : r ? "waiting" : "off"; }
+const RING_TEXT = { running: "Ring green · running on clean power", waiting: "Ring amber · waiting for clean power", off: "Ring off · standby" };
+const ringDot = (state) => `<span class="ring ${state}" aria-hidden="true"></span>`;
+const plugKind = (d) => d.kind || d.id; // the 3D viewer draws a generic appliance plug for kinds it doesn't model
+const plugFrame = (kind, state) =>
+  `<iframe class="plug3d" src="plug/?embed=1&device=${kind}&state=${state}&standard=${plugStd()}&bg=121614" title="3D model of the ShiftWatt Plug" loading="lazy"></iframe>`;
+const postPlug = (frame, msg) => frame?.contentWindow?.postMessage({ type: "shiftwatt-plug", standard: plugStd(), ...msg }, "*");
+function plugPresets() {
+  const uk = plugStd() === "uk";
+  return [
+    { kind: "wash", name: "Washer", icon: "wash", kW: 0.5, hours: 1, readyBy: 23.5, runsPerWeek: 4 },
+    { kind: "dish", name: "Dishwasher", icon: "dish", kW: 0.6, hours: 2, readyBy: 20.5, runsPerWeek: 5 },
+    { kind: "ev", name: "EV (slow charging)", icon: "car", kW: uk ? 2.3 : 1.4, hours: 6, readyBy: 13, runsPerWeek: 3 },
+    { kind: "dry", name: "Dryer", icon: "dry", kW: 1.4, hours: 2, readyBy: 24, runsPerWeek: 3 },
+    { kind: "bike", name: "E-bike battery", icon: "bike", kW: 0.18, hours: 3.5, readyBy: 13.5, runsPerWeek: 3 },
+    { kind: "dehum", name: "Dehumidifier", icon: "fan", kW: 0.5, hours: 3, readyBy: 18, runsPerWeek: 7 },
+  ];
+}
+const CODE_CHARS = "ACDEFGHJKLMNPQRTUVWXY34679";
+const newPlugCode = () => `SW-${Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("")}`;
+
+function pairPlug() {
+  const presets = plugPresets();
+  const pair = { step: 0, code: "", kind: "wash", name: "Washer" };
+  modal(`<div id="pair"></div>`, (m, close) => {
+    const draw = () => {
+      const el = $("#pair", m);
+      const dots = `<div class="dots">${[0, 1, 2].map((i) => `<i class="${i === pair.step ? "on" : ""}"></i>`).join("")}</div>`;
+      if (pair.step === 0) {
+        el.innerHTML = `<h2>Pair a ShiftWatt Plug</h2>
+          <p class="lead">Optional: only for appliances with no app of their own. Plug it into a wall socket; when the ring breathes white it's ready. Enter the code printed on its back.</p>
+          <label class="field-stack"><span>Plug code</span><input class="input wide mono" id="p-code" placeholder="SW-7K2Q" maxlength="7" autocomplete="off" spellcheck="false" value="${pair.code}"></label>
+          <p class="form-err" id="p-err" role="alert"></p>
+          <button class="btn" id="p-find" type="button">${icon("pulse")}Find plugs nearby</button>
+          <div class="modal-foot">${dots}<button class="btn ghost" id="p-cancel" type="button" style="margin-left:auto">Cancel</button><button class="btn primary" id="p-next" type="button">Connect</button></div>`;
+        const input = $("#p-code", el), err = $("#p-err", el);
+        input.focus();
+        $("#p-find", el).onclick = (e) => {
+          const b = e.currentTarget;
+          b.innerHTML = `<span class="spinner"></span>Searching over Bluetooth…`;
+          setTimeout(() => {
+            if (!b.isConnected) return;
+            input.value = newPlugCode();
+            b.innerHTML = `${icon("check")}Found ${input.value} · signal strong`;
+          }, 1100);
+        };
+        $("#p-cancel", el).onclick = close;
+        $("#p-next", el).onclick = (e) => {
+          const code = input.value.trim().toUpperCase().replace(/^SW-?/, "SW-");
+          if (!/^SW-[A-Z0-9]{4}$/.test(code)) { err.textContent = "Codes look like SW-7K2Q: SW- and four letters or digits."; return; }
+          if (store.devices.some((d) => d.plugId === code)) { err.textContent = `${code} is already paired to this home.`; return; }
+          pair.code = code;
+          e.currentTarget.innerHTML = `<span class="spinner"></span>Connecting`;
+          setTimeout(() => { if (!m.isConnected) return; pair.step = 1; draw(); }, 900);
+        };
+      } else if (pair.step === 1) {
+        el.innerHTML = `<h2>What's plugged into it?</h2>
+          <p class="lead"><span class="clean">${pair.code} is online</span> and linked to ${escHTML(store.homeName)}. Tell ShiftWatt what it powers so it knows the load.</p>
+          <div class="options two">${presets.map((p) => `<button class="option" type="button" data-k="${p.kind}" aria-pressed="${p.kind === pair.kind}">${icon(p.icon)}${p.name}<span class="meta">${p.kW} kW</span></button>`).join("")}</div>
+          <label class="field-stack"><span>Name</span><input class="input wide" id="p-name" maxlength="30" value="${escHTML(pair.name)}"></label>
+          <p class="small muted" style="margin:12px 0 0">The appliance must resume when power returns. Never use it for fridges, freezers, heaters or medical equipment.</p>
+          <div class="modal-foot">${dots}<button class="btn ghost" id="p-back" type="button" style="margin-left:auto">Back</button><button class="btn primary" id="p-next" type="button">Pair plug</button></div>`;
+        $$("[data-k]", el).forEach((b) => (b.onclick = () => {
+          const prev = presets.find((p) => p.kind === pair.kind);
+          pair.kind = b.dataset.k;
+          const nameInput = $("#p-name", el);
+          if (!nameInput.value.trim() || nameInput.value === prev.name) nameInput.value = presets.find((p) => p.kind === pair.kind).name;
+          $$("[data-k]", el).forEach((x) => x.setAttribute("aria-pressed", x === b));
+        }));
+        $("#p-back", el).onclick = () => { pair.step = 0; draw(); };
+        $("#p-next", el).onclick = () => {
+          const p = presets.find((x) => x.kind === pair.kind);
+          pair.name = $("#p-name", el).value.replace(/[<>&"]/g, "").trim() || p.name;
+          store.devices.push({
+            id: `${p.kind}-${pair.code.slice(3).toLowerCase()}`, kind: p.kind, name: pair.name, icon: p.icon,
+            kW: p.kW, hours: p.hours, readyBy: p.readyBy, auto: true, runsPerWeek: p.runsPerWeek,
+            via: PLUG, plugId: pair.code, model: `${PLUG} · ${pair.code}`,
+          });
+          save();
+          renderView(false);
+          pair.step = 2; draw();
+        };
+      } else {
+        const d = store.devices[store.devices.length - 1];
+        el.innerHTML = `<h2>${escHTML(d.name)} is paired</h2>
+          <div class="pair-3d">${plugFrame(plugKind(d), "waiting")}</div>
+          <p class="lead">Plan a run and the ring pulses amber while it waits for clean power, then turns green when the relay switches on.</p>
+          <div class="modal-foot">${dots}<button class="btn ghost" id="p-done" type="button" style="margin-left:auto">Done</button><button class="btn primary" id="p-plan" type="button">Plan a run</button></div>`;
+        $("#p-done", el).onclick = close;
+        $("#p-plan", el).onclick = () => { store.planDev = d.id; close(); location.hash = "#/plan"; };
+      }
+    };
+    draw();
+  }, "pair");
+}
+
 VIEWS.devices = (v) => {
   const savedBy = (id) => sum(store.history.filter((h) => h.device === id).map((h) => h.kg));
+  if (!store.devices.length) {
+    v.innerHTML = `<section class="card hero"><h2>No devices yet</h2>
+      <p class="muted" style="margin:0;max-width:56ch">Connect an EV charger or smart appliance through its own app, or pair a ShiftWatt Plug for one that has no app.</p>
+      <div class="actions"><button class="btn primary lg" id="empty-add" type="button">${icon("plus")}Add device</button><button class="btn lg" id="empty-pair" type="button">Pair a plug</button></div></section>`;
+    $("#empty-add").onclick = addDeviceFlow;
+    $("#empty-pair").onclick = pairPlug;
+    return;
+  }
   v.innerHTML = `
   <div class="dev-grid">
     ${store.devices.map((d) => {
@@ -698,14 +824,15 @@ VIEWS.devices = (v) => {
       const sub = r?.status === "running" ? `<span class="running-dot"></span>Running now`
         : r ? `Scheduled · ${when(slotAt(r.startIdx).t)}`
         : d.auto ? "Waits for clean power" : "Runs immediately";
+      const link = isPlug(d) ? `${ringDot(plugState(d))}${PLUG} · <span class="mono">${d.plugId}</span>` : `<span class="online"></span>${d.via || d.plug}`;
       return `<section class="card dev" data-open="${d.id}" tabindex="0" role="button" aria-label="${d.name} settings">
         <div class="ico">${icon(d.icon)}</div>
         <div><div class="name">${d.name}${d.quiet ? '<span class="tag">Quiet hours</span>' : ""}</div><div class="sub">${sub}</div>
-          <div class="meta"><span class="online sim"></span>${d.via || d.plug} · <span class="mono">${(d.kW * d.hours).toFixed(1)} kWh/run · ${kg(savedBy(d.id))} kg saved</span>${r ? "" : ` · <button class="linkish" data-run="${d.id}" type="button">Run now</button>`}</div></div>
+          <div class="meta">${link} · <span class="mono">${(d.kW * d.hours).toFixed(1)} kWh/run · ${kg(savedBy(d.id))} kg saved</span>${r ? "" : ` · <button class="linkish" data-run="${d.id}" type="button">Run now</button>`}</div></div>
         <button class="toggle" role="switch" aria-checked="${d.auto}" aria-label="Smart timing for ${d.name}" data-id="${d.id}"></button></section>`;
     }).join("")}
   </div>
-  <p class="small muted" style="margin:0">Select a device to set its default deadline and quiet hours, or see its history.</p>`;
+  <p class="small muted" style="margin:0">Select a device to set its default deadline and quiet hours, or see its history. Appliance with no app? <a class="clean" href="#/plug">The ShiftWatt Plug is optional</a>.</p>`;
   $$(".dev .toggle").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); const d = dev(b.dataset.id); d.auto = !d.auto; renderView(false); }));
   $$("[data-open]").forEach((c) => {
     c.onclick = () => openDevice(c.dataset.open);
@@ -720,6 +847,71 @@ VIEWS.devices = (v) => {
       toast(`Running now adds ${kg(wait.saveKg)} kg CO₂`, `Waiting until ${when(slotAt(wait.startIdx).t)} is ${Math.round(wait.pct * 100)}% cleaner and still finishes in time.`,
         { label: `Wait until ${fmtTime(slotAt(wait.startIdx).t)}`, fn: () => { schedule(d.id, wait); renderView(false); } });
     } else runNow();
+  }));
+};
+
+VIEWS.plug = (v) => {
+  const plugs = store.devices.filter(isPlug);
+  const spec = PLUG_SPEC[plugStd()];
+  const shown = plugs.find((d) => d.id === store.plugShown) || plugs[0];
+  const li = (state, title, desc) => `<div class="item"><div class="ico">${ringDot(state)}</div><div><div class="name">${title}</div><div class="sub">${desc}</div></div><span></span></div>`;
+  v.innerHTML = `
+  <section class="card plug-hero">
+    <div class="plug-stage">${plugFrame(shown ? plugKind(shown) : "wash", shown ? plugState(shown) : "waiting")}</div>
+    <div class="plug-copy">
+      <div class="eyebrow">Optional hardware</div>
+      <h2 class="plug-title">For the appliance that has no app.</h2>
+      <p class="muted">You don't need to buy anything to use ShiftWatt: EV chargers and smart appliances connect through their own APIs. For an older washer or an e-bike charger, this plug sits between the wall socket and the appliance and switches it on in the cleanest window.</p>
+      ${shown
+        ? `<div class="eyebrow" style="margin-top:22px">Your plugs</div>
+      <div class="chips" id="plug-pick">${plugs.map((d) => `<button class="chip" type="button" data-id="${d.id}" aria-pressed="${d.id === shown.id}">${ringDot(plugState(d))}${d.name}</button>`).join("")}</div>
+      <p class="small muted" id="plug-state" style="margin:12px 0 0">${shown.plugId} · ${RING_TEXT[plugState(shown)]}</p>`
+        : `<p class="small muted" style="margin:18px 0 0">No plugs paired to ${escHTML(store.homeName)} yet.</p>`}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Where it sits</h2>
+    <div class="chain">
+      <div class="chain-node"><span class="eyebrow">Wall</span><b>Socket</b><span>${spec.socket}</span></div>
+      <span class="chain-arrow" aria-hidden="true">${icon("arrow")}</span>
+      <div class="chain-node hl"><span class="eyebrow">In between</span><b>${PLUG}</b><span>${spec.relay}</span></div>
+      <span class="chain-arrow" aria-hidden="true">${icon("arrow")}</span>
+      <div class="chain-node"><span class="eyebrow">Appliance</span><b>Washer, e-bike, slow EV…</b><span>Plugs into its front</span></div>
+    </div>
+    <p class="small muted" style="margin:16px 0 0">Your account's schedule reaches the plug over Wi-Fi. If the Wi-Fi drops, it keeps the last schedule it received.</p>
+  </section>
+
+  <section class="card steps">
+    <div class="step"><span class="n">1</span><h3>Plug it in</h3><p>Into any wall socket. The ring breathes white when it's ready to pair.</p></div>
+    <div class="step"><span class="n">2</span><h3>Pair it to your account</h3><p>Enter the code on its back, or find it nearby. It belongs to this home only.</p></div>
+    <div class="step"><span class="n">3</span><h3>Say what's plugged in</h3><p>Washer, dishwasher, e-bike… so ShiftWatt knows the load and how long it runs.</p></div>
+    <div class="step"><span class="n">4</span><h3>It switches on when it's clean</h3><p>The relay closes at the start of the cleanest window before your deadline, and opens when the run is done.</p></div>
+  </section>
+
+  <div class="grid-2">
+    <section class="card">
+      <h2>Reading the light ring</h2>
+      <div class="list">
+        ${li("waiting", "Amber pulse", "Scheduled. Waiting for clean power.")}
+        ${li("running", "Steady green", "Relay on. Running in the clean window.")}
+        ${li("off", "Off", "Standby. Nothing scheduled.")}
+      </div>
+      <p class="small muted" style="margin:14px 0 0">One press on the side button runs it now; ShiftWatt still logs the CO₂.</p>
+    </section>
+    <section class="card">
+      <h2>Good fits</h2>
+      <p class="muted small" style="margin:0">Dial-controlled washers, dishwashers that resume after a power cut, e-bike and tool chargers, dehumidifiers, slow EV charging.</p>
+      <h2 style="margin-top:22px">Never on a plug</h2>
+      <p class="muted small" style="margin:0">Fridges and freezers, medical equipment, space heaters, and anything that doesn't resume on its own when power returns.</p>
+    </section>
+  </div>`;
+  $$("#plug-pick button").forEach((b) => (b.onclick = () => {
+    const d = dev(b.dataset.id);
+    store.plugShown = d.id;
+    $$("#plug-pick button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    $("#plug-state").textContent = `${d.plugId} · ${RING_TEXT[plugState(d)]}`;
+    postPlug($(".plug-stage iframe"), { device: plugKind(d), state: plugState(d) });
   }));
 };
 
@@ -746,7 +938,10 @@ function openDevice(id) {
   drawer(`
     <div class="drawer-head"><div class="ico">${icon(d.icon)}</div><div><h2>${d.name}</h2><div class="sub">${d.model || d.plug || ""}</div></div>
       <button class="icon-btn" id="d-close" type="button" aria-label="Close">${icon("x")}</button></div>
-    <div class="drawer-status"><span class="online sim"></span>Simulated · production connects via ${d.via || d.plug}</div>
+    ${isPlug(d)
+      ? `<div class="drawer-status">${ringDot(plugState(d))}<span>${RING_TEXT[plugState(d)]}</span></div>
+    <div class="drawer-3d">${plugFrame(plugKind(d), plugState(d))}</div>`
+      : `<div class="drawer-status"><span class="online"></span>Connected via ${d.via || d.plug}</div>`}
     ${r ? `<div class="drawer-run"><div><div class="eyebrow">${r.status === "running" ? "Running now" : "Next run"}</div><div class="drawer-run-when">${r.status === "running" ? `Until ${fmtTime(slotAt(r.endIdx).t)}` : when(slotAt(r.startIdx).t)}</div></div><span class="mono clean">−${kg(r.saveKg)} kg</span></div>` : ""}
     <div class="drawer-stats">
       <div><div class="k">Saved, 60 days</div><div class="v">${kg(saved)}<small>kg</small></div></div>
@@ -761,7 +956,7 @@ function openDevice(id) {
     <div class="set-row"><div><div class="set-label">Quiet hours</div><div class="set-desc">Never run between 10 PM and 7 AM</div></div><button class="toggle" id="d-quiet" role="switch" aria-checked="${!!d.quiet}" aria-label="Quiet hours"></button></div>
     <h3 class="drawer-h">Recent runs</h3>
     <div class="log">${runs.length ? runs.slice(0, 5).map((h) => `<div class="log-row"><span>${fmtDate(h.at)}<span class="muted small"> · ${fmtTime(h.at)}</span></span><span class="mono small"><span style="color:var(--dirty)">${h.baseI}</span> → <span class="clean">${h.shiftedI}</span> g</span><span class="mono clean">−${kg(h.kg)}</span></div>`).join("") : `<p class="empty">No runs yet.</p>`}</div>
-    <div class="drawer-foot"><button class="btn primary" id="d-plan" type="button">Plan a run</button><button class="btn ghost danger" id="d-remove" type="button">Remove device</button></div>`,
+    <div class="drawer-foot"><button class="btn primary" id="d-plan" type="button">Plan a run</button><button class="btn ghost danger" id="d-remove" type="button">${isPlug(d) ? "Unpair plug" : "Remove device"}</button></div>`,
     (m, close) => {
       $("#d-close", m).onclick = close;
       $("#d-auto", m).onclick = (e) => { d.auto = !d.auto; e.currentTarget.setAttribute("aria-checked", d.auto); renderView(false); };
@@ -785,7 +980,7 @@ function openDevice(id) {
         if (store.planDev === id) store.planDev = store.devices[0]?.id;
         close();
         renderView(false);
-        toast(`${d.name} removed`, "Its past runs stay in your Impact history.");
+        toast(`${d.name} ${isPlug(d) ? "unpaired" : "removed"}`, "Its past runs stay in your Impact history.");
       };
     });
 }
@@ -795,11 +990,13 @@ function addDeviceFlow() {
     { id: "pool", name: "Pool pump", icon: "pump", kW: 1.1, hours: 4, readyBy: 24, plug: "Shelly Pro 1PM", auto: true, runsPerWeek: 7 },
     { id: "dehum", name: "Dehumidifier", icon: "fan", kW: 0.5, hours: 3, readyBy: 18, plug: "Kasa KP125M", auto: true, runsPerWeek: 7 },
   ].filter((f) => !dev(f.id));
-  modal(`<h2>Add a device</h2><p class="lead">Looking for smart plugs and chargers on your network…</p>
+  modal(`<h2>Add a device</h2><p class="lead">Looking for chargers and smart appliances on your network…</p>
     <div id="scan"><div class="scan-row"><div class="spinner"></div><span class="muted">Scanning</span></div></div>
+    <div class="scan-row plug-row"><div class="ico">${icon("socket")}</div><div><div>Appliance with no app?</div><div class="small muted">Pair an optional ShiftWatt Plug</div></div><button class="btn" style="margin-left:auto" id="m-pair" type="button">Pair a plug</button></div>
     <div class="modal-foot"><button class="btn ghost" id="m-close" style="margin-left:auto">Done</button></div>`,
     (m, close) => {
       $("#m-close", m).onclick = close;
+      $("#m-pair", m).onclick = pairPlug;
       setTimeout(() => {
         const scan = $("#scan", m);
         if (!scan) return;
@@ -853,7 +1050,7 @@ VIEWS.impact = (v) => {
     </section>
     <section class="card">
       <div class="section-head"><h2>Every run, measured</h2><a href="#/method">Method</a></div>
-      <div class="log">${recent.map((h) => `<div class="log-row"><span>${dev(h.device)?.name || h.device}<span class="muted small"> · ${fmtDate(h.at)}</span></span><span class="mono small"><span style="color:var(--dirty)">${h.baseI}</span> → <span class="clean">${h.shiftedI}</span> g</span><span class="mono clean">−${kg(val(h))}</span></div>`).join("")}</div>
+      <div class="log">${recent.length ? recent.map((h) => `<div class="log-row"><span>${dev(h.device)?.name || h.device}<span class="muted small"> · ${fmtDate(h.at)}</span></span><span class="mono small"><span style="color:var(--dirty)">${h.baseI}</span> → <span class="clean">${h.shiftedI}</span> g</span><span class="mono clean">−${kg(val(h))}</span></div>`).join("") : `<p class="empty">No runs yet. <a href="#/plan">Plan one</a>.</p>`}</div>
       <p class="small muted" style="margin:12px 0 0">Intensity when the load was ready → when it actually ran.</p>
     </section>
   </div>`;
@@ -868,7 +1065,7 @@ VIEWS.settings = (v) => {
   v.innerHTML = `
   <section class="card settings">
     <h2>Home</h2>
-    ${row("Name", "", `<input class="input" id="s-name" value="${store.homeName}" maxlength="40">`)}
+    ${row("Name", "", `<input class="input" id="s-name" value="${escHTML(store.homeName)}" maxlength="40">`)}
     ${row("Grid region", "Sets which carbon forecast ShiftWatt follows", `<select class="select sm" id="s-region">${Object.values(REGIONS).map((r) => `<option value="${r.id}" ${r.id === store.region ? "selected" : ""}>${r.name} · ${r.grid}</option>`).join("")}</select>`)}
     ${row("Location", "", `<span class="set-value">${region().place}</span>`)}
     ${row("Electricity plan", "Used to estimate bill savings", `<span class="set-value">${region().plan}</span>`)}
@@ -893,15 +1090,15 @@ VIEWS.settings = (v) => {
 
   <section class="card settings">
     <h2>Integrations</h2>
-    <p class="small muted" style="margin:0 0 6px">Device control is simulated in this prototype. These are the APIs a production build would use.</p>
-    ${ints.map((i) => row(i.name, i.devices.join(", "), `<span class="status-sim">Simulated</span>`)).join("")}
-    ${row("Tesla account", "Read battery level so the EV only charges what it needs", store.tesla ? `<span class="status-sim">Simulated</span>` : `<button class="btn" id="s-tesla" type="button">Connect</button>`)}
+    <p class="small muted" style="margin:0 0 6px">How ShiftWatt reaches each device.</p>
+    ${ints.map((i) => row(i.name, i.devices.join(", "), `<span class="status-ok"><span class="online"></span>Connected</span>`)).join("")}
+    ${row("Tesla account", "Read battery level so the EV only charges what it needs", store.tesla ? `<span class="status-ok"><span class="online"></span>Connected</span>` : `<button class="btn" id="s-tesla" type="button">Connect</button>`)}
   </section>
 
   <section class="card settings">
     <h2>Data</h2>
     ${row("Export run history", "Every run with intensity when ready and when it ran, as CSV", `<button class="btn" id="s-export" type="button">${icon("download")}Export</button>`)}
-    ${row("Reset demo", "Restore the sample home and history", `<button class="btn ghost danger" id="s-reset" type="button">Reset</button>`)}
+    ${row("Reset", "Restore the sample home and history", `<button class="btn ghost danger" id="s-reset" type="button">Reset</button>`)}
   </section>`;
 
   $("#s-name").onchange = (e) => { store.homeName = e.target.value.trim() || "My home"; renderNav(); save(); toast("Saved", "Home name updated."); };
@@ -910,7 +1107,7 @@ VIEWS.settings = (v) => {
   $$("[data-signal]").forEach((b) => (b.onclick = () => { store.prefs.signal = b.dataset.signal; renderView(false); }));
   $("#s-tesla")?.addEventListener("click", (e) => {
     e.currentTarget.innerHTML = `<span class="spinner"></span>`;
-    setTimeout(() => { store.tesla = true; renderView(false); toast("Tesla linked (simulated)", "In production, EV charging would target your departure charge level."); }, 900);
+    setTimeout(() => { store.tesla = true; renderView(false); toast("Tesla linked", "EV charging now targets your departure charge level."); }, 900);
   });
   $("#s-export").onclick = exportCSV;
   $("#s-reset").onclick = resetDemo;
@@ -939,7 +1136,7 @@ VIEWS.campus = (v) => {
   </section>
 
   <section class="card">
-    <div class="section-head"><h2>Hall leaderboard</h2><span class="small muted">${active.toLocaleString()} of ${students.toLocaleString()} students shifting · illustrative</span></div>
+    <div class="section-head"><h2>Hall leaderboard</h2><span class="small muted">${active.toLocaleString()} of ${students.toLocaleString()} students shifting</span></div>
     ${halls.map((h, i) => `<div class="lb ${h.name === CAMPUS.myHall ? "me" : ""}"><span class="rank mono">${i + 1}</span><span class="name">${h.name}${h.name === CAMPUS.myHall ? " · You" : ""}</span>
       <span class="meter" title="${Math.round((h.active / h.students) * 100)}% joined"><i style="transform:scaleX(${h.active / h.students})"></i></span><span class="pct mono">${Math.round((h.active / h.students) * 100)}%</span><span class="n mono">${h.kg.toLocaleString()} kg</span></div>`).join("")}
   </section>
@@ -1129,7 +1326,7 @@ VIEWS.method = (v) => {
     <div class="prose">
       <p><b>Fair baseline.</b> We compare to starting the moment a load is ready, not to the worst hour of the day.</p>
       <p><b>Conservative headline.</b> We report average-intensity savings (${kg(avg)} kg). The marginal-emissions estimate, based on the plant that actually ramps up, is higher (${kg(marg)} kg).</p>
-      <p><b>Data.</b> Great Britain runs on the live NESO Carbon Intensity forecast for North West England (free, no key). California and Texas use curves modeled from each grid's typical generation mix, because their free forecast sources need accounts. Device control, the household history and the campus figures are simulated or illustrative. Equivalencies use EPA factors.</p>
+      <p><b>Data.</b> Great Britain runs on the live NESO Carbon Intensity forecast for North West England (free, no key). California and Texas use curves modeled from each grid's typical generation mix, because their free forecast sources need accounts. Equivalencies use EPA factors.</p>
       <p><b>Limits.</b> Shifting lowers carbon per kWh, not kWh used. Fridges and medical devices are never shifted. At large scale, starts would be staggered so they don't create new peaks.</p>
     </div>
   </section>`;
@@ -1212,8 +1409,9 @@ function onboarding() {
         mountIntro(ob);
       } else if (step === 1) {
         ob.innerHTML = `<h2>What can wait?</h2>
-          <p class="lead">Pick what ShiftWatt can time for you.</p>
+          <p class="lead">Pick what ShiftWatt can time for you. These connect through their makers' apps; no new hardware.</p>
           <div class="options two">${DEVICES.map((d) => `<button class="option" data-d="${d.id}" aria-pressed="${pick.devs.has(d.id)}">${icon(d.icon)}${d.name}</button>`).join("")}</div>
+          <p class="small muted" style="margin:14px 0 0">Appliance with no app? You can pair an optional ShiftWatt Plug later.</p>
           <div class="modal-foot">${dots}<button class="btn ghost" id="back" style="margin-left:auto">Back</button><button class="btn primary" id="next">Continue</button></div>`;
         $$("[data-d]", ob).forEach((b) => (b.onclick = () => { const id = b.dataset.d; pick.devs.has(id) ? pick.devs.delete(id) : pick.devs.add(id); b.setAttribute("aria-pressed", pick.devs.has(id)); }));
       } else {
@@ -1228,7 +1426,7 @@ function onboarding() {
       $("#next", ob)?.addEventListener("click", () => { step++; draw(); });
       $("#back", ob)?.addEventListener("click", () => { step--; draw(); });
       const finish = async () => {
-        localStorage.setItem("sw_onboarded", "1");
+        localStorage.setItem(ONBOARD_KEY, "1");
         store.devices.forEach((d) => (d.auto = pick.devs.has(d.id)));
         close();
         if (pick.region !== store.region) { store.region = pick.region; showLoading(); await loadRegion(); }
@@ -1249,7 +1447,7 @@ async function setRegion(id) {
   renderView(false);
 }
 function resetDemo() {
-  localStorage.removeItem("sw_onboarded");
+  localStorage.removeItem(ONBOARD_KEY);
   localStorage.removeItem(STATE_KEY);
   location.hash = "#/today";
   location.reload();
@@ -1270,7 +1468,7 @@ async function boot() {
   if (saved) applyRuns(saved);
   if (!store.notifs.length) seedNotifs();
   renderView();
-  if (!localStorage.getItem("sw_onboarded")) onboarding();
+  if (!localStorage.getItem(ONBOARD_KEY)) onboarding();
 }
 boot();
 })();

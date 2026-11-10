@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShiftWatt Plug · 3D</title>
+<meta name="theme-color" content="#0a0d0b">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d0b; --surface: #121614; --surface-2: #181d1a;
+    --line: rgba(232,255,238,0.07); --line-2: rgba(232,255,238,0.12);
+    --fg: #ecf2ee; --fg-2: #b8c4bc; --muted: #7c8a81;
+    --clean: #5be3a0; --amber: #f2b84b; --accent-ink: #062014;
+    --sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  canvas { display: block; }
+  #stage { position: fixed; inset: 0; }
+  .eyebrow { font: 500 11px var(--mono); color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .head { position: fixed; top: 24px; left: 28px; pointer-events: none; }
+  .head h1 { margin: 6px 0 2px; font-size: 28px; font-weight: 650; font-stretch: 112%; letter-spacing: -.02em; }
+  .head p { margin: 0; color: var(--fg-2); max-width: 380px; }
+  .back { pointer-events: auto; color: var(--muted); text-decoration: none; font: 500 12px var(--mono); }
+  .back:hover { color: var(--fg); }
+
+  .panel { position: fixed; top: 24px; right: 24px; width: 300px; display: grid; gap: 10px; }
+  .card { background: rgba(18,22,20,.86); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .status { display: grid; grid-template-columns: 10px 1fr; gap: 4px 10px; align-items: center; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .status[data-s="waiting"] .dot { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+  .status[data-s="running"] .dot { background: var(--clean); box-shadow: 0 0 10px var(--clean); }
+  .status-title { font-weight: 600; }
+  .status-sub { grid-column: 2; color: var(--fg-2); font-size: 13px; }
+  .meter { display: flex; justify-content: space-between; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .meter b { display: block; font: 500 18px var(--mono); }
+  .seg { display: flex; gap: 4px; background: var(--surface-2); padding: 3px; border-radius: 10px; margin-top: 6px; }
+  .seg button { flex: 1; border: 0; background: transparent; padding: 6px 8px; border-radius: 7px; color: var(--fg-2); font-size: 13px; transition: background-color 150ms ease, color 150ms ease; }
+  .seg button[aria-pressed="true"] { background: var(--fg); color: var(--bg); font-weight: 600; }
+  .seg button:hover:not([aria-pressed="true"]) { color: var(--fg); }
+  .row + .row { margin-top: 12px; }
+  .actions { display: flex; gap: 6px; }
+  .btn { flex: 1; border: 1px solid var(--line-2); background: var(--surface-2); border-radius: 10px; padding: 8px; font-size: 13px; }
+  .btn.primary { background: var(--clean); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .btn:active { transform: scale(.97); }
+  .specs { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; color: var(--fg-2); }
+  .specs li { display: flex; justify-content: space-between; gap: 10px; }
+  .specs span:last-child { color: var(--fg); text-align: right; }
+  .hint { position: fixed; left: 28px; bottom: 22px; color: var(--muted); font: 12px var(--mono); }
+  @media (max-width: 760px) {
+    .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; max-height: 45vh; overflow: auto; }
+    .hint { display: none; }
+  }
+  /* embedded in the app: canvas only */
+  body.embed .head, body.embed .panel, body.embed .hint { display: none; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="stage"></div>
+
+<div class="head">
+  <a class="back" href="../">← ShiftWatt</a>
+  <h1>ShiftWatt Plug</h1>
+  <p>Sits between the wall socket and your appliance. Switches it on in the cleanest hour your account schedules.</p>
+</div>
+
+<div class="panel">
+  <div class="card">
+    <div class="status" id="status" data-s="waiting">
+      <span class="dot"></span><span class="status-title" id="status-title"></span>
+      <span class="status-sub" id="status-sub"></span>
+    </div>
+    <div class="meter">
+      <div><span class="eyebrow">Power</span><b id="m-power">0 W</b></div>
+      <div><span class="eyebrow">Grid</span><b id="m-grid">—</b></div>
+      <div><span class="eyebrow">Relay</span><b id="m-relay">Off</b></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="row"><span class="eyebrow">Plugged in</span>
+      <div class="seg" data-key="device">
+        <button data-v="ev">EV</button><button data-v="wash">Washer</button><button data-v="dish">Dishwasher</button>
+      </div>
+    </div>
+    <div class="row"><span class="eyebrow">State</span>
+      <div class="seg" data-key="state">
+        <button data-v="off">Off</button><button data-v="waiting">Waiting</button><button data-v="running">Running</button>
+      </div>
+    </div>
+    <div class="row"><span class="eyebrow">Socket</span>
+      <div class="seg" data-key="standard">
+        <button data-v="us">US · Type B</button><button data-v="uk">UK · Type G</button>
+      </div>
+    </div>
+    <div class="row"><span class="eyebrow">Finish</span>
+      <div class="seg" data-key="finish">
+        <button data-v="white">White</button><button data-v="graphite">Graphite</button>
+      </div>
+    </div>
+    <div class="row actions">
+      <button class="btn" id="explode" type="button">Exploded view</button>
+      <button class="btn primary" id="replay" type="button">Replay plug-in</button>
+    </div>
+  </div>
+  <div class="card">
+    <span class="eyebrow">Specs</span>
+    <ul class="specs" id="specs" style="margin-top:8px"></ul>
+  </div>
+</div>
+<div class="hint">Drag to orbit · scroll to zoom</div>
+
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+/* Units: 1 = 1 cm. Wall surface at z = 0, everything faces +z. */
+
+const STANDARDS = {
+  us: {
+    label: "NEMA 5-15", volts: 120, amps: 15,
+    body: { w: 5.8, h: 6.4, d: 3.4, r: 0.6 },
+    wallPlate: { w: 7.0, h: 11.4 }, wallOutlets: [[0, 2.2], [0, -2.2]], // [x, y]
+    // socket openings on a face, in face coords
+    holes: [
+      { kind: "rect", x: -0.635, y: 0.55, w: 0.2, h: 0.82 }, // neutral (taller)
+      { kind: "rect", x: 0.635, y: 0.55, w: 0.2, h: 0.66 },  // hot
+      { kind: "ground", x: 0, y: -0.75, r: 0.27 },
+    ],
+    prongs: [
+      { kind: "blade", x: -0.635, y: 0.55, w: 0.15, h: 0.79, len: 1.6 },
+      { kind: "blade", x: 0.635, y: 0.55, w: 0.15, h: 0.63, len: 1.6 },
+      { kind: "pin", x: 0, y: -0.75, r: 0.24, len: 1.9 },
+    ],
+    loads: { ev: 1440, wash: 500, dish: 1200 },
+  },
+  uk: {
+    label: "BS 1363", volts: 230, amps: 13,
+    body: { w: 6.0, h: 8.2, d: 4.2, r: 0.7 },
+    wallPlate: { w: 8.6, h: 8.6 }, wallOutlets: [[-0.55, 0]],
+    holes: [
+      { kind: "rect", x: 0, y: 1.25, w: 0.48, h: 0.9 },     // earth
+      { kind: "rect", x: -1.11, y: -0.97, w: 0.76, h: 0.48 }, // neutral
+      { kind: "rect", x: 1.11, y: -0.97, w: 0.76, h: 0.48 },  // live
+    ],
+    prongs: [
+      { kind: "blade", x: 0, y: 1.25, w: 0.4, h: 0.8, len: 2.27 },
+      { kind: "blade", x: -1.11, y: -0.97, w: 0.635, h: 0.4, len: 1.78, sleeve: 0.9 },
+      { kind: "blade", x: 1.11, y: -0.97, w: 0.635, h: 0.4, len: 1.78, sleeve: 0.9 },
+    ],
+    loads: { ev: 2300, wash: 500, dish: 1200 },
+  },
+};
+
+const DEVICES = {
+  ev:   { name: "EV charger", plug: { w: 3.6, h: 4.2, d: 3.0 }, cord: 0x1b1f1d, cordR: 0.42 },
+  wash: { name: "Washer",     plug: { w: 3.0, h: 3.6, d: 2.4 }, cord: 0xe8e8e3, cordR: 0.3 },
+  dish: { name: "Dishwasher", plug: { w: 3.0, h: 3.6, d: 2.4 }, cord: 0x2a2d2b, cordR: 0.3 },
+  other: { name: "Appliance", plug: { w: 3.0, h: 3.6, d: 2.4 }, cord: 0x2a2d2b, cordR: 0.3 },
+};
+
+const FINISHES = {
+  white:    { body: 0xf1f1ec, face: 0xe6e7e1, rough: 0.42 },
+  graphite: { body: 0x2a2f2c, face: 0x202422, rough: 0.5 },
+};
+
+const COLORS = { waiting: new THREE.Color(0xf2b84b), running: new THREE.Color(0x5be3a0), off: new THREE.Color(0x000000) };
+
+/* ?embed=1&device=wash&state=running&standard=uk&finish=white&bg=121614 — used by the app's iframes.
+   The app also sends the same fields later via postMessage({ type: "shiftwatt-plug", ... }). */
+const params = new URLSearchParams(location.search);
+const EMBED = params.has("embed");
+const ui = { device: "ev", state: "waiting", standard: "us", finish: "white" };
+function take(src) {
+  if (src.device) ui.device = DEVICES[src.device] ? src.device : "other";
+  if (["off", "waiting", "running"].includes(src.state)) ui.state = src.state;
+  if (STANDARDS[src.standard]) ui.standard = src.standard;
+  if (FINISHES[src.finish]) ui.finish = src.finish;
+}
+take(Object.fromEntries(params));
+document.body.classList.toggle("embed", EMBED);
+const BG = /^[0-9a-f]{6}$/i.test(params.get("bg") || "") ? parseInt(params.get("bg"), 16) : 0x0a0d0b;
+
+/* ---------- renderer / scene ---------- */
+const stage = document.getElementById("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.Fog(BG, 40, 75);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.3;
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(19, 7, 30);
+// keep the model clear of the right-hand panel on wide screens
+function frame() {
+  camera.aspect = innerWidth / innerHeight;
+  if (!EMBED && innerWidth > 760) camera.setViewOffset(innerWidth, innerHeight, 170, 0, innerWidth, innerHeight);
+  else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
+frame();
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -0.5, 3);
+controls.enableDamping = true;
+controls.minDistance = 8;
+controls.maxDistance = 55;
+controls.enableZoom = !EMBED; // don't hijack page scroll inside the app
+controls.maxPolarAngle = Math.PI * 0.62;
+controls.minAzimuthAngle = -Math.PI * 0.45;
+controls.maxAzimuthAngle = Math.PI * 0.45;
+
+const key = new THREE.DirectionalLight(0xffffff, 1.3);
+key.position.set(12, 16, 22);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
+key.shadow.bias = -0.0004;
+key.shadow.radius = 4;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfe8d2, 0.45);
+rim.position.set(-14, 8, 6);
+scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xdfeee6, 0x0a0d0b, 0.25));
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+// high threshold: only the emissive light ring blooms, not the white plastic
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.7, 0.45, 1.05);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ---------- materials ---------- */
+const mat = {
+  body: new THREE.MeshPhysicalMaterial({ color: FINISHES.white.body, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.4 }),
+  face: new THREE.MeshPhysicalMaterial({ color: FINISHES.white.face, roughness: 0.5, clearcoat: 0.2 }),
+  hole: new THREE.MeshStandardMaterial({ color: 0x050605, roughness: 1 }),
+  brass: new THREE.MeshStandardMaterial({ color: 0xd9c08a, metalness: 1, roughness: 0.28 }),
+  nickel: new THREE.MeshStandardMaterial({ color: 0xc9ccc8, metalness: 1, roughness: 0.25 }),
+  sleeve: new THREE.MeshStandardMaterial({ color: 0x111312, roughness: 0.6 }),
+  ring: new THREE.MeshStandardMaterial({ color: 0x1a1d1b, emissive: COLORS.waiting.clone(), emissiveIntensity: 2, roughness: 0.3 }),
+  wall: new THREE.MeshStandardMaterial({ color: 0x1b201d, roughness: 0.95 }),
+  plate: new THREE.MeshPhysicalMaterial({ color: 0xe4e4de, roughness: 0.38, clearcoat: 0.3 }),
+  plug: new THREE.MeshPhysicalMaterial({ color: 0x1d2120, roughness: 0.55, clearcoat: 0.15 }),
+  cord: new THREE.MeshStandardMaterial({ color: 0x1b1f1d, roughness: 0.7 }),
+  button: new THREE.MeshPhysicalMaterial({ color: 0xd8d9d3, roughness: 0.3, clearcoat: 0.6 }),
+};
+
+/* ---------- geometry helpers ---------- */
+function roundedRect(w, h, r) {
+  const s = new THREE.Shape();
+  const x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y);
+  return s;
+}
+
+function holePath(h) {
+  if (h.kind === "ground") {
+    // NEMA ground: a "D" — round top, flat bottom
+    const p = new THREE.Path();
+    const a = Math.asin(0.55);
+    p.absarc(h.x, h.y, h.r, -a, Math.PI + a, false);
+    p.lineTo(h.x + Math.cos(a) * h.r, h.y - 0.55 * h.r);
+    return p;
+  }
+  const pts = roundedRect(h.w, h.h, Math.min(h.w, h.h) * 0.18).getPoints(6)
+    .map(v => new THREE.Vector2(v.x + h.x, v.y + h.y));
+  return new THREE.Path(pts);
+}
+
+/** Socket face: plate with openings + dark backing behind each opening. */
+function socketFace(std, w, h, r, depth, faceMat) {
+  const g = new THREE.Group();
+  const shape = roundedRect(w, h, r);
+  for (const hole of std.holes) shape.holes.push(holePath(hole));
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 3, curveSegments: 16 });
+  const plate = new THREE.Mesh(geo, faceMat);
+  plate.castShadow = plate.receiveShadow = true;
+  g.add(plate);
+  const back = new THREE.Mesh(new THREE.ShapeGeometry(roundedRect(w - 0.1, h - 0.1, r)), mat.hole);
+  back.position.z = -0.002;
+  g.add(back);
+  // contact clips visible deep inside the openings
+  for (const hole of std.holes) {
+    if (hole.kind !== "rect") continue;
+    const clip = new THREE.Mesh(new THREE.BoxGeometry(hole.w * 0.5, hole.h * 0.7, 0.02), mat.brass);
+    clip.position.set(hole.x, hole.y, 0.004);
+    g.add(clip);
+  }
+  return g;
+}
+
+function prongs(std, metal) {
+  const g = new THREE.Group();
+  for (const p of std.prongs) {
+    let m;
+    if (p.kind === "pin") {
+      m = new THREE.Mesh(new THREE.CylinderGeometry(p.r, p.r, p.len, 28), metal);
+      m.rotation.x = -Math.PI / 2; // cylinder axis +y → points into the wall (-z)
+      const tip = new THREE.Mesh(new THREE.SphereGeometry(p.r, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), metal);
+      tip.position.y = p.len / 2;
+      m.add(tip);
+    } else {
+      m = new THREE.Mesh(new RoundedBoxGeometry(p.w, p.h, p.len, 2, Math.min(p.w, p.h) * 0.2), metal);
+      if (p.sleeve) {
+        const sl = new THREE.Mesh(new RoundedBoxGeometry(p.w + 0.03, p.h + 0.03, p.sleeve, 2, 0.06), mat.sleeve);
+        sl.position.z = p.len / 2 - p.sleeve / 2;
+        m.add(sl);
+      }
+    }
+    m.position.set(p.x, p.y, -p.len / 2);
+    m.castShadow = true;
+    g.add(m);
+  }
+  return g;
+}
+
+function logoTexture(dark) {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 128;
+  const x = c.getContext("2d");
+  const ink = dark ? "rgba(236,242,238,0.78)" : "rgba(30,36,33,0.72)";
+  x.strokeStyle = ink; x.fillStyle = ink;
+  x.lineWidth = 11; x.lineCap = "round";
+  x.beginPath(); x.moveTo(30, 82); x.bezierCurveTo(70, 82, 70, 36, 100, 36); x.bezierCurveTo(130, 36, 132, 82, 176, 82); x.stroke();
+  x.font = "600 62px Archivo, system-ui, sans-serif";
+  x.textBaseline = "middle";
+  x.fillText("ShiftWatt", 196, 62);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+/* ---------- builders ---------- */
+const world = new THREE.Group();
+scene.add(world);
+
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(140, 90), mat.wall);
+wall.position.set(0, 0, -0.5);
+wall.receiveShadow = true;
+scene.add(wall);
+
+let wallGroup, adapter, appliance, ledLight, logoMat;
+
+function buildWall(std) {
+  const g = new THREE.Group();
+  const { w, h } = std.wallPlate;
+  const plate = new THREE.Mesh(new RoundedBoxGeometry(w, h, 0.5, 4, 0.22), mat.plate);
+  plate.position.z = -0.25;
+  plate.castShadow = plate.receiveShadow = true;
+  g.add(plate);
+  for (const [x, y] of std.wallOutlets) {
+    const face = socketFace(std, std === STANDARDS.us ? 3.5 : 5.2, std === STANDARDS.us ? 4.0 : 4.6, std === STANDARDS.us ? 1.2 : 0.4, 0.18, mat.plate);
+    face.position.set(x, y, 0);
+    g.add(face);
+    if (std === STANDARDS.uk) {
+      // UK wall sockets have a rocker switch
+      const sw = new THREE.Mesh(new RoundedBoxGeometry(1.0, 1.6, 0.5, 3, 0.15), mat.plate);
+      sw.position.set(3.2, 0.5, 0.2); sw.rotation.x = -0.12;
+      sw.castShadow = true;
+      g.add(sw);
+    }
+  }
+  return g;
+}
+
+function buildAdapter(std) {
+  const g = new THREE.Group();
+  const { w, h, d, r } = std.body;
+  const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 8, r), mat.body);
+  body.position.z = d / 2;
+  body.castShadow = body.receiveShadow = true;
+  g.add(body);
+
+  // light ring around the socket face
+  const ring = roundedRect(w - 1.3, h - 1.3, 0.55);
+  ring.holes.push(roundedRect(w - 1.62, h - 1.62, 0.42));
+  const ringMesh = new THREE.Mesh(new THREE.ExtrudeGeometry(ring, { depth: 0.05, bevelEnabled: false, curveSegments: 16 }), mat.ring);
+  ringMesh.position.z = d - 0.01;
+  g.add(ringMesh);
+
+  // recessed socket face
+  const fw = w - 1.85, fh = h - 1.85;
+  const face = socketFace(std, fw, fh, 0.38, 0.12, mat.face);
+  face.position.z = d + 0.005;
+  g.add(face);
+
+  // logo along the bottom of the face
+  const tex = logoTexture(ui.finish === "graphite");
+  logoMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, toneMapped: false });
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.4), logoMat);
+  logo.position.set(0, -fh / 2 + 0.42, d + 0.17);
+  g.add(logo);
+
+  // side button (manual override)
+  const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.16, 32), mat.button);
+  btn.rotation.z = Math.PI / 2;
+  btn.position.set(w / 2 + 0.02, h * 0.18, d * 0.55);
+  btn.castShadow = true;
+  g.add(btn);
+  const btnIcon = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 32, Math.PI * 1.6), mat.sleeve);
+  btnIcon.rotation.y = Math.PI / 2;
+  btnIcon.rotation.x = -Math.PI / 2 - Math.PI * 0.8 + Math.PI / 2;
+  btnIcon.position.set(w / 2 + 0.105, h * 0.18, d * 0.55);
+  g.add(btnIcon);
+
+  // vent slots on top
+  for (let i = -2; i <= 2; i++) {
+    const v = new THREE.Mesh(new RoundedBoxGeometry(0.16, 0.05, d * 0.5, 2, 0.025), mat.hole);
+    v.position.set(i * 0.38, h / 2 - 0.005, d * 0.45);
+    g.add(v);
+  }
+
+  g.add(prongs(std, std === STANDARDS.us ? mat.brass : mat.nickel));
+
+  ledLight = new THREE.PointLight(0xf2b84b, 0, 9, 2);
+  ledLight.position.set(0, 0, d + 1.2);
+  g.add(ledLight);
+  return g;
+}
+
+function buildAppliance(std, dev) {
+  const g = new THREE.Group();
+  // BS 1363 plugs are much larger than NEMA ones (fused, sleeved pins)
+  const uk = std === STANDARDS.uk;
+  const w = uk ? 4.6 : dev.plug.w, h = uk ? 5.2 : dev.plug.h, d = dev.plug.d;
+  // appliance plug body
+  const body = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 8, 0.7), mat.plug);
+  body.position.z = d / 2;
+  body.castShadow = body.receiveShadow = true;
+  g.add(body);
+  // strain relief + cord exiting the bottom-front
+  const relief = new THREE.Mesh(new THREE.CylinderGeometry(dev.cordR * 1.45, dev.cordR * 1.15, 1.6, 24), mat.plug);
+  relief.position.set(0, -h / 2 - 0.5, d * 0.55);
+  relief.castShadow = true;
+  g.add(relief);
+  mat.cord.color.setHex(dev.cord);
+  mat.plug.color.setHex(dev.cord); // molded plug matches its cord
+  const pts = [
+    new THREE.Vector3(0, -h / 2 - 1.2, d * 0.55),
+    new THREE.Vector3(0, -h / 2 - 4, d * 0.9),
+    new THREE.Vector3(1.5, -h / 2 - 9, d + 2.5),
+    new THREE.Vector3(4, -h / 2 - 16, d + 3.5),
+    new THREE.Vector3(7, -h / 2 - 30, d + 3),
+  ];
+  const cord = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 120, dev.cordR, 16), mat.cord);
+  cord.castShadow = true;
+  g.add(cord);
+  g.add(prongs(std, std === STANDARDS.us ? mat.brass : mat.nickel));
+  return g;
+}
+
+/* ---------- assembly + animation ---------- */
+const anim = { t: 0, from: { a: 0, p: 0 }, to: { a: 0, p: 0 }, dur: 1 };
+const pos = { a: 0, p: 0 }; // z offsets: adapter from wall, appliance from adapter
+let exploded = false;
+
+function rebuild() {
+  for (const o of [wallGroup, adapter, appliance]) if (o) { world.remove(o); o.traverse(n => n.geometry?.dispose()); }
+  logoMat?.map?.dispose();
+  const std = STANDARDS[ui.standard];
+  wallGroup = buildWall(std);
+  adapter = buildAdapter(std);
+  appliance = buildAppliance(std, DEVICES[ui.device]);
+  const [outletX, outletY] = std.wallOutlets[0];
+  wallGroup.position.set(-outletX, -outletY, 0); // center the used outlet on the adapter
+  world.add(wallGroup, adapter, appliance);
+  applyFinish();
+  layout();
+}
+
+function layout() {
+  const std = STANDARDS[ui.standard];
+  adapter.position.z = pos.a;
+  appliance.position.z = pos.a + std.body.d + 0.12 + pos.p;
+}
+
+function animateTo(a, p, dur = 1.1) {
+  anim.from = { ...pos }; anim.to = { a, p }; anim.t = 0; anim.dur = dur;
+}
+
+function replay() {
+  pos.a = 7; pos.p = 6; layout();
+  exploded = false;
+  document.getElementById("explode").textContent = "Exploded view";
+  seq = [() => animateTo(0, 6, 1.0), () => animateTo(0, 0, 0.9)];
+  seqNext();
+}
+let seq = [];
+function seqNext() { const f = seq.shift(); if (f) f(); }
+
+const ease = t => 1 - Math.pow(1 - t, 4);
+
+/* ---------- UI ---------- */
+function applyFinish() {
+  const f = FINISHES[ui.finish];
+  mat.body.color.setHex(f.body); mat.body.roughness = f.rough;
+  mat.face.color.setHex(f.face);
+  mat.button.color.setHex(ui.finish === "graphite" ? 0x3a403c : 0xd8d9d3);
+  if (logoMat) { logoMat.map.dispose(); logoMat.map = logoTexture(ui.finish === "graphite"); logoMat.needsUpdate = true; }
+}
+
+function renderUI() {
+  for (const seg of document.querySelectorAll(".seg")) {
+    for (const b of seg.children) b.setAttribute("aria-pressed", String(ui[seg.dataset.key] === b.dataset.v));
+  }
+  const std = STANDARDS[ui.standard];
+  const dev = DEVICES[ui.device];
+  const st = document.getElementById("status");
+  st.dataset.s = ui.state;
+  const copy = {
+    off: ["Off", `${dev.name} paused. No run scheduled.`],
+    waiting: ["Waiting for clean power", `${dev.name} starts 11:30 · 85% cleaner than now`],
+    running: ["Running on clean power", `${dev.name} · started 11:30 · 92 g CO₂/kWh`],
+  }[ui.state];
+  document.getElementById("status-title").textContent = copy[0];
+  document.getElementById("status-sub").textContent = copy[1];
+  document.getElementById("m-relay").textContent = ui.state === "running" ? "On" : "Off";
+  document.getElementById("m-grid").textContent = ui.state === "running" ? "92 g" : ui.state === "waiting" ? "612 g" : "—";
+  document.getElementById("specs").innerHTML = [
+    ["Standard", `${std.label} · ${std.volts} V`],
+    ["Relay", `${std.amps} A latching · ${(std.volts * std.amps / 1000).toFixed(1)} kW max`],
+    ["Metering", "Per-second V, A, W, kWh"],
+    ["Radio", "Wi-Fi 2.4 GHz · Matter · BLE setup"],
+    ["Light ring", "Amber waiting · green running"],
+    ["Offline", "Keeps last schedule locally"],
+  ].map(([k, v]) => `<li><span>${k}</span><span>${v}</span></li>`).join("");
+}
+
+for (const seg of document.querySelectorAll(".seg")) {
+  seg.addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    const key = seg.dataset.key, prev = ui[key];
+    ui[key] = b.dataset.v;
+    if (key === "finish") applyFinish();
+    if ((key === "standard" || key === "device") && prev !== ui[key]) { rebuild(); if (key === "standard") replay(); }
+    renderUI();
+  });
+}
+document.getElementById("replay").addEventListener("click", replay);
+document.getElementById("explode").addEventListener("click", e => {
+  exploded = !exploded;
+  e.currentTarget.textContent = exploded ? "Assemble" : "Exploded view";
+  seq = [];
+  animateTo(exploded ? 6 : 0, exploded ? 6 : 0, 0.9);
+});
+
+addEventListener("resize", () => {
+  frame();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+/* ---------- loop ---------- */
+const clock = new THREE.Clock();
+let shownPower = 0;
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+  controls.update();
+
+  if (anim.t < 1) {
+    anim.t = Math.min(1, anim.t + dt / anim.dur);
+    const k = ease(anim.t);
+    pos.a = THREE.MathUtils.lerp(anim.from.a, anim.to.a, k);
+    pos.p = THREE.MathUtils.lerp(anim.from.p, anim.to.p, k);
+    layout();
+    if (anim.t === 1) seqNext();
+  }
+
+  // ring lights once the adapter is seated in the wall (or when shown exploded)
+  const seated = pos.a < 0.05;
+  const plugged = seated && pos.p < 0.05;
+  const state = seated || exploded ? ui.state : "off";
+  const target = COLORS[state];
+  const pulse = state === "waiting" ? 0.55 + 0.45 * Math.sin(time * 2.4) : state === "running" ? 0.85 + 0.15 * Math.sin(time * 0.9) : 0;
+  mat.ring.emissive.lerp(target, 0.12);
+  mat.ring.emissiveIntensity = 0.15 + pulse * 4;
+  if (ledLight) { ledLight.color.copy(mat.ring.emissive); ledLight.intensity = pulse * 4; }
+
+  const load = STANDARDS[ui.standard].loads[ui.device];
+  const want = state === "running" ? load * (0.97 + 0.03 * Math.sin(time * 3.1)) : plugged ? 0.4 : 0;
+  shownPower += (want - shownPower) * 0.08;
+  document.getElementById("m-power").textContent = shownPower >= 1000 ? `${(shownPower / 1000).toFixed(2)} kW` : `${shownPower.toFixed(shownPower < 10 ? 1 : 0)} W`;
+
+  composer.render();
+  requestAnimationFrame(tick);
+}
+
+rebuild();
+renderUI();
+if (!EMBED) replay();
+addEventListener("message", (e) => {
+  if (e.origin !== location.origin || e.data?.type !== "shiftwatt-plug") return;
+  const before = ui.device + ui.standard;
+  take(e.data);
+  if (ui.device + ui.standard !== before) rebuild();
+  else applyFinish();
+  renderUI();
+});
+document.fonts.ready.then(() => applyFinish()); // redraw logo once Archivo loads
+tick();
+</script>
+</body>
+</html>

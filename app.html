@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ShiftWatt</title>
+<meta name="description" content="ShiftWatt runs your flexible appliances when the grid is cleanest. Same electricity, less CO₂.">
+<meta name="theme-color" content="#0a0d0b">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <a class="brand" href="./" title="ShiftWatt home">
+      <span class="brand-mark"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 10.5c2.2 0 2.6-5 5-5s2.8 5 6 5" stroke="#062014" stroke-width="1.9" stroke-linecap="round"/></svg></span>
+      ShiftWatt
+    </a>
+    <a class="home-switch" href="#/settings" id="home-switch"></a>
+    <nav class="nav" id="nav"></nav>
+    <div class="sidebar-foot">
+      <nav class="nav" id="nav-foot"></nav>
+      <button class="intro-btn" id="watch-intro" type="button">
+        <span class="intro-thumb"><img src="https://i.ytimg.com/vi/6B3TAKk6Wms/mqdefault.jpg" alt="" width="64" height="36"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+        <span><span class="intro-title">Watch the intro</span><span class="intro-sub">1 minute</span></span>
+      </button>
+      <div class="user"><span class="avatar">JD</span><div><div class="user-name">John Doe</div><div class="user-plan">Free plan</div></div></div>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <div class="titles">
+        <h1 id="page-title">Today</h1>
+        <p class="page-sub" id="page-sub"></p>
+      </div>
+      <div class="topbar-right">
+        <div id="page-actions" class="page-actions"></div>
+        <div class="pill" id="live-pill"></div>
+        <div class="bell-wrap">
+          <button class="icon-btn" id="bell" type="button" aria-label="Notifications" aria-expanded="false"></button>
+          <div class="popover" id="inbox" hidden></div>
+        </div>
+      </div>
+    </header>
+    <div id="view" class="view page"></div>
+  </main>
+</div>
+<nav class="tabbar" id="tabbar"></nav>
+<div class="demo-bar" role="region" aria-label="Clock controls">
+  <span class="demo-tag">Clock</span>
+  <span class="demo-clock mono" id="demo-clock"></span>
+  <button class="demo-btn" id="ff" type="button" title="Fast-forward the clock to the next scheduled start or finish">Skip to next run →</button>
+  <button class="demo-btn muted" id="reset" type="button">Reset</button>
+</div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div id="modal-root"></div>
+<div id="drawer-root"></div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

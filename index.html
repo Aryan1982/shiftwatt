@@ -2,63 +2,230 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ShiftWatt</title>
-<meta name="description" content="ShiftWatt runs your flexible appliances when the grid is cleanest. Same electricity, less CO₂.">
-<meta name="theme-color" content="#0a0d0b">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ShiftWatt · Same electricity, cleaner hours</title>
+<meta name="description" content="ShiftWatt reads the live grid carbon forecast and runs your EV, dishwasher and laundry in the cleanest hours before your deadline. Free, no new hardware.">
+<meta name="theme-color" content="#0b0d0c">
+<meta property="og:title" content="ShiftWatt · Same electricity, cleaner hours">
+<meta property="og:description" content="Runs flexible loads in the cleanest window before your deadline. Live UK grid data, free, no new hardware.">
+<meta property="og:image" content="screenshots/0-thumbnail.png">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://api.carbonintensity.org.uk" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="landing.css">
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js" } }</script>
 </head>
 <body>
-<div class="app">
-  <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-mark"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.5 10.5c2.2 0 2.6-5 5-5s2.8 5 6 5" stroke="#062014" stroke-width="1.9" stroke-linecap="round"/></svg></span>
-      ShiftWatt
-    </div>
-    <a class="home-switch" href="#/settings" id="home-switch"></a>
-    <nav class="nav" id="nav"></nav>
-    <div class="sidebar-foot">
-      <nav class="nav" id="nav-foot"></nav>
-      <button class="intro-btn" id="watch-intro" type="button">
-        <span class="intro-thumb"><img src="https://i.ytimg.com/vi/6B3TAKk6Wms/mqdefault.jpg" alt="" width="64" height="36"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>
-        <span><span class="intro-title">Watch the intro</span><span class="intro-sub">1 minute</span></span>
-      </button>
-      <div class="user"><span class="avatar">AK</span><div><div class="user-name">Aryan K.</div><div class="user-plan">Free plan</div></div></div>
-    </div>
-  </aside>
-  <main>
-    <header class="topbar">
-      <div class="titles">
-        <h1 id="page-title">Today</h1>
-        <p class="page-sub" id="page-sub"></p>
-      </div>
-      <div class="topbar-right">
-        <div id="page-actions" class="page-actions"></div>
-        <div class="pill" id="live-pill"></div>
-        <div class="bell-wrap">
-          <button class="icon-btn" id="bell" type="button" aria-label="Notifications" aria-expanded="false"></button>
-          <div class="popover" id="inbox" hidden></div>
+
+<header class="nav">
+  <a class="wordmark" href="#hero" aria-label="ShiftWatt, back to top">
+    <svg width="22" height="22" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M1.5 10.5c2.4 0 2.8-5.2 5.4-5.2s3 5.2 7.6 5.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    ShiftWatt
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#try">Try it</a><a href="#how">How it works</a><a href="#app">The app</a><a href="#faq">FAQ</a>
+  </nav>
+  <a class="nav-cta" href="app.html">Open the app <span aria-hidden="true">→</span></a>
+</header>
+
+<main>
+  <!-- ============ hero: live 3D landscape driven by the real forecast ============ -->
+  <section class="hero" id="hero">
+    <canvas id="scene" aria-hidden="true"></canvas>
+    <div class="hero-shade" aria-hidden="true"></div>
+
+    <div class="hero-copy">
+      <h1>Same electricity,<br><em>cleaner hours.</em></h1>
+      <div class="hero-row">
+        <p class="sub">ShiftWatt runs your EV charger, dishwasher and laundry when the grid is cleanest, before the deadline you set.</p>
+        <div class="hero-actions">
+          <a class="cta" href="app.html">Open the app <span aria-hidden="true">→</span></a>
+          <a class="textlink light" href="#film">Watch the film</a>
         </div>
       </div>
-    </header>
-    <div id="view" class="view page"></div>
-  </main>
-</div>
-<nav class="tabbar" id="tabbar"></nav>
-<div class="demo-bar" role="region" aria-label="Demo controls">
-  <span class="demo-tag">Demo</span>
-  <span class="demo-clock mono" id="demo-clock"></span>
-  <button class="demo-btn" id="ff" type="button" title="Fast-forward the clock to the next scheduled start or finish">Skip to next run →</button>
-  <button class="demo-btn muted" id="reset" type="button">Reset</button>
-</div>
-<div class="toasts" id="toasts" aria-live="polite"></div>
-<div id="modal-root"></div>
-<div id="drawer-root"></div>
-<script src="data.js"></script>
-<script src="app.js"></script>
+    </div>
+
+    <aside class="hud" aria-live="polite">
+      <p class="hud-when mono" id="hud-when">North West England</p>
+      <p class="hud-I"><b id="hud-I">—</b><span class="mono">g CO₂/kWh</span></p>
+      <p class="hud-verdict" id="hud-verdict">Reading the forecast…</p>
+    </aside>
+
+    <div class="timeline" id="timeline" hidden>
+      <div class="tl-head mono">
+        <span class="tl-title">Next 48 hours · drag to explore</span>
+        <button class="tl-btn" id="tl-play" type="button" aria-pressed="false">Play</button>
+      </div>
+      <div class="tl-track" id="tl-track" tabindex="0" role="slider" aria-label="Forecast time" aria-valuemin="0" aria-valuemax="95">
+        <div class="tl-bars" id="tl-bars"></div>
+        <div class="tl-best" id="tl-best"></div>
+        <div class="tl-cursor" id="tl-cursor"></div>
+      </div>
+      <div class="tl-axis mono" id="tl-axis"></div>
+    </div>
+  </section>
+
+  <!-- ============ the idea ============ -->
+  <section class="paper" id="why">
+    <div class="sheet">
+      <p class="big">Right now, <span class="hl" id="rg-names">North Scotland and South Wales</span> are running at <b id="rg-lo">0</b>&thinsp;g and <b class="dirty" id="rg-hi">329</b>&thinsp;g of CO₂ per kWh. Same country, same wires.</p>
+      <p class="big">Your dishwasher doesn't need to run <em>now</em>. It needs to be done <em>by morning</em>. ShiftWatt lives in that gap.</p>
+      <p class="source mono">Live from the <a href="https://carbonintensity.org.uk/" target="_blank" rel="noopener">NESO Carbon Intensity API</a></p>
+
+      <table class="ledger">
+        <tr><td class="num"><span data-count="3.4">3.4</span><small>M&thinsp;MWh</small></td><td>of wind and solar power California threw away in 2024, because nobody was using it at the time. <a class="textlink" href="https://www.eia.gov/todayinenergy/detail.php?id=65364" target="_blank" rel="noopener">EIA</a></td></tr>
+        <tr><td class="num"><span data-count="5.9">5.9</span><small>→</small><span class="green" data-count="1.1">1.1</span><small>kg</small></td><td>One EV charge, same 18&thinsp;kWh, moved from the evening peak to ShiftWatt's pick. Cheaper, too.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ try it ============ -->
+  <section class="paper" id="try">
+    <div class="sheet">
+      <h2>Pick something that <em>can wait.</em></h2>
+      <p class="intro">The same optimizer the app runs, on today's live forecast.</p>
+
+      <figure class="fig">
+        <div class="fig-controls">
+          <div class="opts" id="d-load">
+            <button type="button" data-k="ev" aria-pressed="true">EV charge</button>
+            <button type="button" data-k="dish" aria-pressed="false">Dishwasher</button>
+            <button type="button" data-k="wash" aria-pressed="false">Laundry</button>
+          </div>
+          <div class="pick"><span class="mono">done by</span>
+            <div class="opts" id="d-dead">
+              <button type="button" data-h="morning" aria-pressed="true">7 AM</button>
+              <button type="button" data-h="24" aria-pressed="false">24 h</button>
+              <button type="button" data-h="48" aria-pressed="false">48 h</button>
+            </div>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <div class="anno" id="d-anno" aria-hidden="true">
+            <span>cleanest</span>
+            <svg width="46" height="34" viewBox="0 0 46 34" fill="none"><path d="M3 4c14 1 30 6 36 24" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><path d="M33 23l6 6 3-8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="demo-chart" id="d-chart" role="img" aria-label="48-hour carbon intensity forecast with the start-now and best windows marked"></div>
+          <div class="demo-axis mono" id="d-axis"></div>
+        </div>
+        <p class="verdict">Start now: <b class="dirty" id="r-now">—</b>. ShiftWatt starts it <b id="r-when">—</b>: <b class="green" id="r-best">—</b>, <b id="r-pct">—</b> less.</p>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============ how ============ -->
+  <section class="paper" id="how">
+    <div class="sheet">
+      <h2>Set a deadline, <em>not a time.</em></h2>
+      <ol class="steps">
+        <li><span class="mono">01</span><h3>Say when it must be done.</h3><p>“Car charged by 7.” “Dishes clean before dinner.”</p></li>
+        <li><span class="mono">02</span><h3>ShiftWatt checks every half hour.</h3><p>Against the grid's 48-hour carbon forecast.</p></li>
+        <li><span class="mono">03</span><h3>It runs in the cleanest window.</h3><p>And logs how much CO₂ that saved.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ film ============ -->
+  <section class="dark film" id="film">
+    <div class="sheet">
+      <h2>Watch one evening <em>get shifted.</em></h2>
+      <button class="video" type="button" data-yt="xLnWNbJzWCU" aria-label="Play the ShiftWatt film">
+        <img src="screenshots/1-today.png" alt="" width="1875" height="1250" loading="lazy" decoding="async">
+        <span class="play"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>Play · 1 min</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ the app ============ -->
+  <section class="paper" id="app">
+    <div class="sheet">
+      <h2>Every number <em>has a source.</em></h2>
+      <div class="collage">
+        <figure class="c-main"><div class="frame"><img data-speed="-0.05" src="screenshots/2-plan.png" alt="Plan screen comparing start now with the best time" width="1875" height="1250" loading="lazy" decoding="async"></div>
+          <figcaption>Plan: start now vs. the best window, in kilograms.</figcaption></figure>
+        <figure class="c-side"><div class="frame"><img data-speed="-0.05" src="screenshots/6-live.png" alt="Live grid screen with NESO data" width="1875" height="1250" loading="lazy" decoding="async"></div>
+          <figcaption>Live grid, straight from NESO.</figcaption></figure>
+        <figure class="c-side"><div class="frame"><img data-speed="-0.05" src="screenshots/4-impact.png" alt="Impact screen with CO₂ avoided over 60 days" width="1875" height="1250" loading="lazy" decoding="async"></div>
+          <figcaption>Impact: every run, logged.</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ the plug ============ -->
+  <section class="dark" id="plug">
+    <div class="sheet plug-grid">
+      <div class="plug-copy">
+        <h2>For the appliance <em>with no app.</em></h2>
+        <p class="intro">You don't need new hardware. But if an old washer has no app, an optional plug sits between it and the wall and switches it on at the right time.</p>
+        <a class="textlink light" href="plug/">See it in 3D →</a>
+      </div>
+      <div class="plug-stage">
+        <iframe id="plug3d" src="plug/?embed=1&device=wash&state=waiting&bg=0f1210" title="Interactive 3D model of the ShiftWatt Plug" loading="lazy"></iframe>
+        <div class="plug-ctl mono">
+          <div class="opts on-dark" id="p-state">
+            <button type="button" data-v="waiting" aria-pressed="true">Waiting</button>
+            <button type="button" data-v="running" aria-pressed="false">Running</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ how we count ============ -->
+  <section class="paper" id="honest">
+    <div class="sheet">
+      <h2>The conservative number, <em>every time.</em></h2>
+      <div class="equation">
+        <p class="eq"><i>saved</i> = <i>kWh</i> × (<i>I</i><sub>ready</sub> − <i>I</i><sub>run</sub>)</p>
+        <p class="where">Compared with starting the moment it's ready. Never with the dirtiest hour.</p>
+      </div>
+      <table class="ledger scale">
+        <tr><td class="num">≈&thinsp;<span data-count="500">500</span><small>kg</small></td><td>CO₂ a year for a California home with an EV.</td></tr>
+        <tr><td class="num">≈&thinsp;<span data-count="106">106</span><small>t</small></td><td>CO₂ a year for a campus of 2,400 students shifting laundry.</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ faq ============ -->
+  <section class="paper" id="faq">
+    <div class="sheet">
+      <h2>Fair <em>questions.</em></h2>
+      <div class="qa">
+        <div><h3>Do I need to buy anything?</h3><p>No. It works through the apps your charger and appliances already have.</p></div>
+        <div><h3>Is the grid data real?</h3><p>Yes. Great Britain is live from NESO, including the landscape at the top of this page.</p></div>
+        <div><h3>What never gets shifted?</h3><p>Fridges, freezers, medical equipment. Only what you mark as flexible.</p></div>
+        <div><h3>What does it cost?</h3><p>Nothing. Clean hours are often cheaper hours, too.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ end ============ -->
+  <section class="dark final">
+    <div class="sheet">
+      <h2>Same electricity,<br><em>cleaner hours.</em></h2>
+      <div class="final-row">
+        <a class="cta" href="app.html">Open the app <span aria-hidden="true">→</span></a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="sheet foot-row">
+    <span>ShiftWatt · Green Shift Hacks 2026</span>
+    <nav aria-label="Links">
+      <a href="https://github.com/Aryan1982/shiftwatt" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://carbonintensity.org.uk/" target="_blank" rel="noopener">NESO data</a>
+      <a href="https://www.eia.gov/todayinenergy/detail.php?id=65364" target="_blank" rel="noopener">EIA</a>
+      <a href="https://www.youtube.com/watch?v=6B3TAKk6Wms" target="_blank" rel="noopener">Intro video</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="landing.js"></script>
+<script type="module" src="landing3d.js"></script>
 </body>
 </html>
