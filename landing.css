@@ -174,15 +174,28 @@ h2 em { color: var(--green); }
 .steps h3 { margin: 18px 0 14px; font: 400 30px/1.08 var(--serif); letter-spacing: -0.01em; }
 .steps p { margin: 0; color: var(--ink-2); font-size: 16px; }
 
-/* film */
-.film h2 { margin-bottom: 48px; }
-.video { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; padding: 0; border: 1px solid var(--snow-rule); border-radius: 4px; overflow: hidden; background: var(--night-2); }
+/* film: sits right under the hero, so it continues the hero's night colour */
+.dark.film { padding: 64px 0 120px; }
+.film-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 38ch); gap: 48px; align-items: end; margin-bottom: 36px; }
+.film-title { font-size: clamp(36px, 4.2vw, 60px); line-height: 1; max-width: 18ch; }
+.film-note { margin: 0; color: var(--snow-2); font-size: 16px; }
+.video { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--snow-rule); border-radius: 6px; overflow: hidden; background: #000; box-shadow: 0 50px 100px -50px rgba(0,0,0,.9); }
 .video img, .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
-.video img { opacity: .62; filter: saturate(.9); transition: opacity 300ms ease, transform 900ms var(--ease); }
-.video:hover img { opacity: .78; transform: scale(1.01); }
-.play { position: absolute; left: 32px; bottom: 28px; display: inline-flex; align-items: center; gap: 10px; height: 48px; padding: 0 20px 0 16px; border-radius: 3px; background: var(--snow); color: var(--ink); font: 550 15px var(--sans); transition: transform 200ms var(--ease); }
-.play svg { width: 18px; height: 18px; }
-.video:hover .play { transform: translateX(4px); }
+.video iframe.preview { opacity: 0; pointer-events: none; transform: scale(1.02); transition: opacity 700ms ease; }
+.video.previewing iframe.preview { opacity: 1; }
+.video-hit { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; padding: 0; border: 0; cursor: pointer; background: linear-gradient(0deg, rgba(0,0,0,.6) 0%, rgba(0,0,0,0) 32%), rgba(0,0,0,.12); transition: background-color 200ms ease; }
+.video-hit:hover { background-color: rgba(0,0,0,.02); }
+.play-big { width: 88px; height: 88px; border-radius: 50%; display: grid; place-items: center; background: var(--snow); color: var(--ink); box-shadow: 0 0 0 10px rgba(244,241,234,.16), 0 20px 40px -10px rgba(0,0,0,.6); transition: transform 220ms var(--ease), box-shadow 220ms ease; }
+.play-big svg { width: 32px; height: 32px; margin-left: 4px; }
+.video-hit:hover .play-big { transform: scale(1.07); box-shadow: 0 0 0 16px rgba(244,241,234,.12), 0 20px 40px -10px rgba(0,0,0,.6); }
+.video-bar { position: absolute; left: 22px; right: 22px; bottom: 18px; z-index: 3; display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--snow); pointer-events: none; }
+.vb-prev { display: none; }
+.video.previewing .vb-idle { display: none; }
+.video.previewing .vb-prev { display: inline; }
+.video-bar .track { flex: 1; height: 3px; border-radius: 2px; background: rgba(244,241,234,.28); overflow: hidden; }
+.video-bar .track i { display: block; width: 0; height: 100%; background: var(--snow); }
+.video.previewing .track i { animation: film-progress 62s linear infinite; }
+@keyframes film-progress { to { width: 100%; } }
 
 /* § 4 collage */
 .collage { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 40px 32px; margin-top: 72px; }
@@ -286,6 +299,10 @@ h2 em { color: var(--green); }
   .chart-wrap { margin-top: 32px; }
   .demo-chart { height: 180px; }
   .demo-axis span:nth-child(even) { display: none; }
-  .play { left: 16px; bottom: 16px; height: 42px; }
+  .play-big { width: 64px; height: 64px; }
+  .play-big svg { width: 24px; height: 24px; }
+  .video-bar { left: 14px; right: 14px; bottom: 12px; font-size: 11px; }
+  .vb-state { display: none; }
+  .film-row { grid-template-columns: 1fr; gap: 16px; }
   .final-row { flex-direction: column; align-items: flex-start; }
 }

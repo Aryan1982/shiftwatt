@@ -229,13 +229,32 @@ const plug = { state: "waiting", standard: "us" };
 const sendPlug = () => $("#plug3d").contentWindow?.postMessage({ type: "shiftwatt-plug", device: "wash", ...plug }, "*");
 seg("p-state", "v", (v) => { plug.state = v; sendPlug(); });
 
-/* ---------- video: load YouTube only on click ---------- */
-$$("[data-yt]").forEach((b) => (b.onclick = () => {
-  const box = document.createElement("div");
-  box.className = "video";
-  box.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${b.dataset.yt}?autoplay=1&rel=0&modestbranding=1" title="ShiftWatt demo" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
-  b.replaceWith(box);
-}));
+/* ---------- film: muted moving preview once it's on screen, full player with sound on click ---------- */
+const film = $("#film-player");
+const yt = (params) => `https://www.youtube-nocookie.com/embed/${film.dataset.yt}?${params}&rel=0&modestbranding=1&playsinline=1&cc_load_policy=0&iv_load_policy=3`;
+function startPreview() {
+  const f = document.createElement("iframe");
+  f.className = "preview";
+  f.src = yt(`autoplay=1&mute=1&controls=0&disablekb=1&loop=1&playlist=${film.dataset.yt}&enablejsapi=1&origin=${encodeURIComponent(location.origin)}`);
+  f.allow = "autoplay; encrypted-media";
+  f.tabIndex = -1;
+  f.setAttribute("aria-hidden", "true");
+  // The film already has burned-in subtitles; switch off YouTube's caption track so they don't double up.
+  const cmd = (func, args = []) => f.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args }), "*");
+  f.onload = () => {
+    [300, 1000, 2000, 3500].forEach((ms) => setTimeout(() => { cmd("unloadModule", ["captions"]); cmd("unloadModule", ["cc"]); }, ms));
+    // let YouTube get past its title card before fading the preview in
+    setTimeout(() => film.classList.add("previewing"), 1200);
+  };
+  $(".poster", film).after(f);
+}
+if (!reduceMotion && "IntersectionObserver" in window) {
+  new IntersectionObserver(([e], io) => { if (e.isIntersecting) { io.disconnect(); startPreview(); } }, { threshold: 0.35 }).observe(film);
+}
+$(".video-hit", film).onclick = () => {
+  film.classList.add("playing");
+  film.innerHTML = `<iframe src="${yt("autoplay=1")}" title="ShiftWatt film" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+};
 
 /* ---------- nav turns solid after the hero ---------- */
 const nav = $(".nav");
