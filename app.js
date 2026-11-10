@@ -157,7 +157,7 @@ const STATE_KEY = "sw_state", ONBOARD_KEY = "sw_onboarded";
 function save() {
   if (!store.slots.length) return;
   const state = {
-    v: 1,
+    v: 2, // v2: sample home renamed to John's home
     region: store.region, homeName: store.homeName, prefs: store.prefs, tesla: store.tesla,
     period: store.period, planMode: store.planMode, scale: store.scale, booked: store.booked, reminded: store.reminded,
     devices: store.devices,
@@ -170,7 +170,7 @@ function save() {
 function readState() {
   try {
     const s = JSON.parse(localStorage.getItem(STATE_KEY) || "null");
-    return s && s.v === 1 ? s : null;
+    return s && s.v === 2 ? s : null;
   } catch { return null; }
 }
 function applySettings(s) {
